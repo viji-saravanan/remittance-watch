@@ -1,26 +1,65 @@
 # RemitWatch
 
-> Send $200 home — know exactly what it costs before you choose. A transparent, open-source
-> comparison of the **true total cost** of remittances: fees *and* the FX margin providers hide
-> inside the exchange rate.
+> Send $200 home and know what it *really* costs before you pick a provider.
+> Ranks money-transfer services by true total cost — the visible fee **plus** the margin
+> hidden inside the exchange rate — using the World Bank's open pricing data.
+> No affiliate links. The ranking cannot be bought.
 
-**Status:** 🚧 under active development — M0 (bootstrap) in progress. This README is a placeholder;
-the full product README (problem, demo, quickstart, architecture) lands with the first deployable.
+**Status:** M0 (skeleton) — the landing is live-ready; data pipeline lands in M1.
+[Build log →](https://github.com/viji-saravanan/remittance-watch/issues?q=milestone%3A%22M0%22)
 
-- **Data:** World Bank [Remittance Prices Worldwide](https://remittanceprices.worldbank.org)
-  (quarterly, free) + ECB reference FX rates.
-- **License:** MIT. **Data license:** see `docs/data-provenance.md` (landing with M1).
-- **Principles:** no affiliate links, ever · rank by true cost · methodology fully public.
+## Why this exists
 
-## Repository map
+The global average cost of sending $200 is **6.36%** (Q3 2025) against a UN target of 3%
+by 2030 ([RPW Issue 54](https://remittanceprices.worldbank.org/sites/default/files/2026-04/RPW_main_report_and_annex_Q325.pdf)).
+Existing comparators monetize per sign-up, so their rankings lean toward paying partners —
+and none decompose the cost hidden inside exchange rates. RemitWatch does both the opposite way:
+open data in, transparent ranking out, zero affiliate revenue possible by charter
+([ethics rules](CONTRIBUTING.md#the-ethics-charter-read-this-first)).
 
+## Quickstart
+
+```bash
+npm install
+npm run dev     # http://localhost:3000
+npm run lint    # typecheck + eslint (what CI runs)
+npm run build   # production build
 ```
-docs/            product framing, ADRs, data provenance, methodology
-app/             Next.js application (lands in M0)
-pipeline/        ingestion + normalization (lands in M1)
-tests/           fixtures + contract tests (lands in M1)
-```
+
+Node ≥ 20. No database or API keys needed until M1.
+
+## Architecture (one paragraph)
+
+A Next.js 15 app reads a normalized Postgres dataset; a Python pipeline (uv + openpyxl)
+parses the World Bank's quarterly workbook into it via GitHub Actions cron; daily FX
+snapshots come from a CC0 CDN source. Deployed on free tiers end to end. Decisions and their
+evidence live in [`docs/adr/`](docs/adr/) — grounded in verified research under
+[`docs/research/`](docs/research/).
+
+## What we deliberately did NOT build
+
+- Live quotes from providers (their calculators are deliberately closed; we compare published,
+  auditable data instead — see [prior art research](docs/research/03-prior-art.md))
+- User accounts (anonymous alert emails only, from M4)
+- Any affiliate/referral mechanism whatsoever
+- Pre-2016 legacy workbook support (different schema, low value)
+
+## Data provenance
+
+| Dataset | Source | License | Refresh |
+|---|---|---|---|
+| Remittance Prices Worldwide | [World Bank Data Catalog #0037898](https://datacatalog.worldbank.org/search/dataset/0037898/remittance-prices-worldwide) | CC BY 4.0 | Quarterly |
+| FX reference rates | [fawazahmed0/exchange-api](https://github.com/fawazahmed0/exchange-api) | CC0 1.0 | Daily |
+
+Full provenance policy lands with M1 in `docs/data-provenance.md`.
+
+## Team & process
 
 Maintained by [@viji-saravanan](https://github.com/viji-saravanan) with
-[@callmearya](https://github.com/callmearya). Contributions welcome — read `CONTRIBUTING.md`
-(landing with M2) and open an issue first.
+[@callmearya](https://github.com/callmearya). `main` is protected: everything merges through
+reviewed PRs. See [CONTRIBUTING.md](CONTRIBUTING.md) before opening one.
+
+## License
+
+Code: MIT ([LICENSE](LICENSE)). Upstream data: CC BY 4.0, © The World Bank — RemitWatch is
+not affiliated with the World Bank or any transfer provider.
