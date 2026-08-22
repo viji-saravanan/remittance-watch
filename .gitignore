@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+.venv/
+__pycache__/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# env & secrets
+.env
+.env*.local
+
+# testing & coverage
+coverage/
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# data snapshots are committed deliberately under fixtures/ — nothing else raw
+/data/
+*.xlsx
+!tests/fixtures/*.xlsx
