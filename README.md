@@ -5,7 +5,8 @@
 > hidden inside the exchange rate — using the World Bank's open pricing data.
 > No affiliate links. The ranking cannot be bought.
 
-**Status:** M0 (skeleton) — the landing is live-ready; data pipeline lands in M1.
+**Status:** M0 shipped — [live on GitHub Pages](https://viji-saravanan.github.io/remittance-watch/);
+data pipeline lands in M1.
 [Build log →](https://github.com/viji-saravanan/remittance-watch/issues?q=milestone%3A%22M0%22)
 
 ## Why this exists
@@ -23,24 +24,28 @@ open data in, transparent ranking out, zero affiliate revenue possible by charte
 npm install
 npm run dev     # http://localhost:3000
 npm run lint    # typecheck + eslint (what CI runs)
-npm run build   # production build
+npm run build   # static export → out/
 ```
 
-Node ≥ 20. No database or API keys needed until M1.
+Node ≥ 20. No API keys and no hosted services — the pipeline's Postgres is a local or CI
+container (lands with M1).
 
 ## Architecture (one paragraph)
 
-A Next.js 15 app reads a normalized Postgres dataset; a Python pipeline (uv + openpyxl)
-parses the World Bank's quarterly workbook into it via GitHub Actions cron; daily FX
-snapshots come from a CC0 CDN source. Deployed on free tiers end to end. Decisions and their
-evidence live in [`docs/adr/`](docs/adr/) — grounded in verified research under
-[`docs/research/`](docs/research/).
+A Next.js 15 app, statically exported to GitHub Pages — there is no server anywhere. A Python
+pipeline (uv + openpyxl) parses the World Bank's quarterly workbook inside a CI job (Postgres
+as an ephemeral transform workspace) and emits versioned JSON artifacts that both the site and
+the public API serve; daily FX rates come from a CC0 CDN, fetched client-side. Zero accounts
+beyond GitHub. Decisions and their evidence live in [`docs/adr/`](docs/adr/) — grounded in
+verified research under [`docs/research/`](docs/research/).
 
 ## What we deliberately did NOT build
 
 - Live quotes from providers (their calculators are deliberately closed; we compare published,
   auditable data instead — see [prior art research](docs/research/03-prior-art.md))
 - User accounts (anonymous alert emails only, from M4)
+- A server runtime — the workload is static by construction (quarterly data, fixed amounts;
+  see [ADR-0005](docs/adr/0005-github-pages-static-export.md))
 - Any affiliate/referral mechanism whatsoever
 - Pre-2016 legacy workbook support (different schema, low value)
 

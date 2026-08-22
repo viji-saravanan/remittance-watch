@@ -7,6 +7,7 @@ Immutable once accepted; superseded by writing a new ADR that references its pre
 | [0001](0001-toolchain-split.md) | TypeScript app (Next.js 15/drizzle) + Python ingestion (uv/openpyxl) | accepted |
 | [0002](0002-data-source-and-schema.md) | Parse Data Catalog workbook; schema v1; non-transparent providers flagged & excluded by default | accepted |
 | [0003](0003-fx-rate-source.md) | exchange-api primary chain; snapshot-first; open.er-api runtime-only | accepted |
-| [0004](0004-deploy-and-environments.md) | Vercel Hobby + Neon free + Actions cron; preview-per-PR | accepted |
+| [0004](0004-deploy-and-environments.md) | Vercel Hobby + Neon free + Actions cron; preview-per-PR | superseded by [0005](0005-github-pages-static-export.md) |
+| [0005](0005-github-pages-static-export.md) | GitHub Pages static export, zero servers; Postgres demoted to CI workspace | accepted |
 
-Grounding evidence for all four: [`../research/`](../research/) (verified 2026-08-22).
+Grounding evidence for all five: [`../research/`](../research/) (verified 2026-08-22).

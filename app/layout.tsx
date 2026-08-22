@@ -15,6 +15,9 @@ const ui = Public_Sans({
 });
 
 export const metadata: Metadata = {
+  // Static export (ADR-0005): absolute base for OG/twitter URLs — without it Next
+  // resolves relative OG paths against localhost:3000.
+  metadataBase: new URL("https://viji-saravanan.github.io/remittance-watch"),
   title: {
     default: "RemitWatch — the true cost of sending money home",
     template: "%s · RemitWatch",

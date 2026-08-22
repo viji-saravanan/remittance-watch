@@ -52,7 +52,7 @@ const PRINCIPLES = [
 ];
 
 const ROADMAP = [
-  { id: "M0", desc: "Skeleton, design system, CI, deploy", state: "in progress", href: `${REPO}/issues/2` },
+  { id: "M0", desc: "Skeleton, design system, CI, deploy", state: "shipped", href: `${REPO}/issues/2` },
   { id: "M1", desc: "World Bank workbook → tested Postgres dataset", state: "queued", href: `${REPO}/issues/3` },
   { id: "M2", desc: "Corridor search & true-cost ranking UI", state: "queued", href: `${REPO}/issues/4` },
   { id: "M3", desc: "Public API for researchers & journalists", state: "queued", href: `${REPO}/issues/5` },

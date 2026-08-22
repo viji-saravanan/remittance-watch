@@ -39,8 +39,8 @@ npm run dev        # http://localhost:3000
 npm run test       # unit + contract tests
 ```
 
-Postgres runs locally via docker or points at a Neon dev branch — see `docs/adr/` for the
-current decision on environments (landing with M0/M1).
+Postgres runs as an ephemeral container — local docker or the CI service container. It is a
+pipeline workspace, never a hosted dependency; see `docs/adr/` for the current decisions.
 
 ## Data contributions
 
