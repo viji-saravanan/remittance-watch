@@ -5,8 +5,9 @@
 > hidden inside the exchange rate — using the World Bank's open pricing data.
 > No affiliate links. The ranking cannot be bought.
 
-**Status:** M0 shipped — [live on GitHub Pages](https://viji-saravanan.github.io/remittance-watch/);
-data pipeline lands in M1.
+**Status:** M0 shipped — [live on GitHub Pages](https://viji-saravanan.github.io/remittance-watch/).
+M1 (ingestion pipeline) built: 204,469 source rows → 408,938 quotes across 37 quarters,
+contract-tested, idempotent. M2 (cost explorer UI) is next.
 [Build log →](https://github.com/viji-saravanan/remittance-watch/issues?q=milestone%3A%22M0%22)
 
 ## Why this exists
@@ -28,7 +29,7 @@ npm run build   # static export → out/
 ```
 
 Node ≥ 20. No API keys and no hosted services — the pipeline's Postgres is a local or CI
-container (lands with M1).
+container (see [`pipeline/`](pipeline/)).
 
 ## Architecture (one paragraph)
 
@@ -56,7 +57,8 @@ verified research under [`docs/research/`](docs/research/).
 | Remittance Prices Worldwide | [World Bank Data Catalog #0037898](https://datacatalog.worldbank.org/search/dataset/0037898/remittance-prices-worldwide) | CC BY 4.0 | Quarterly |
 | FX reference rates | [fawazahmed0/exchange-api](https://github.com/fawazahmed0/exchange-api) | CC0 1.0 | Daily |
 
-Full provenance policy lands with M1 in `docs/data-provenance.md`.
+Full provenance policy — source, license, refresh mechanism, and every upstream
+data quirk we handle — lives in [`docs/data-provenance.md`](docs/data-provenance.md).
 
 ## Team & process
 
