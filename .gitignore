@@ -26,3 +26,6 @@ Thumbs.db
 /data/
 *.xlsx
 !tests/fixtures/*.xlsx
+
+# typescript incremental build cache
+*.tsbuildinfo
