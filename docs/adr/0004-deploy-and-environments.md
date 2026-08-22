@@ -1,6 +1,6 @@
 # ADR-0004 · Deploy & environments: Vercel Hobby + Neon free + Actions cron
 
-- Status: accepted · Date: 2026-08-22 · Deciders: viji-saravanan, callmearya
+- Status: superseded by [0005](0005-github-pages-static-export.md) · Date: 2026-08-22 · Deciders: viji-saravanan, callmearya
 
 ## Context
 
