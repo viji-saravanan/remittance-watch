@@ -1,0 +1,417 @@
+{
+  "summary": "Ground RemitWatch ADRs in verified facts: World Bank RPW data format, FX API landscape, prior art, market stats",
+  "agentCount": 4,
+  "logs": [],
+  "result": {
+    "rpw": {
+      "summary": "# World Bank Remittance Prices Worldwide (RPW) — ground truth for ingestion\n\n## 1. Download page & latest release\n- Official site `https://remittanceprices.worldbank.org` (+ `/data-download`, `/resources`) is behind a **Cloudflare JS challenge**: every page AND file under it returns **HTTP 403** (`cf-mitigated: challenge`) to curl/WebFetch even with a browser User-Agent. It is not usable for programmatic ingestion.\n- Working mirror: **World Bank Data Catalog dataset 0037898 \"Remittance Prices Worldwide\"**, version 6 — https://datacatalog.worldbank.org/search/dataset/0037898/remittance-prices-worldwide\n- **Latest quarterly release = Q3 2025 (Issue No. 54, September 2025)**; global average cost 6.36%. No Issue 55 / Q4-2025 found on official channels as of 2026-08-22 (a third-party site references \"Q4 2025\" figures, unconfirmed officially).\n- **Verified direct download (HTTP 200, curl + browser UA)**: `https://datacatalogfiles.worldbank.org/ddh-published/0037898/DR0095523/rpw_dataset_2011_2025_q3.xlsx` — 50,762,620 bytes, valid xlsx, catalog lists it updated May 5, 2026. Companion PDF: `https://datacatalogfiles.worldbank.org/ddh-published/0037898/DR0095413/RPW_main_report_and_annex_Q325.pdf`.\n\n## 2. Workbook structure (all VERIFIED by opening the downloaded file with openpyxl)\nSix sheets: `'Terms of Use'` (3 reference links), `'Methodology'` (empty in this build), `'Legend'` (data dictionary, 36 rows), `'Countries'`, `'Dataset (up to Q1 2016)'`, `'Dataset (from Q2 2016)'`.\n\n**Main sheet `Dataset (from Q2 2016)`**: ONE header row (row 1), **42 named columns, 204,469 data rows**, 37 quarters `2016_2Q … 2025_3Q`. Note **`2025_2Q` does not exist** (no collection round that quarter).\n\nColumn map (exact header strings):\n```\nid, period,\nsource_code, source_name, source_region, source_income, source_lending, source_G8G20,\ndestination_code, destination_name, destination_region, destination_income, destination_lending, destination_G8G20,\nfirm, firm_type, [payment instrument], [access point], [speed actual],\ncc1 lcu amount, cc1 denomination amount, cc1 lcu code, cc1 lcu fee, cc1 lcu fx rate, cc1 fx margin, cc1 total cost %,\ncc2 lcu amount, cc2 denomination amount, cc2 lcu code, cc2 lcu fee, cc2 lcu fx rate, cc2 fx margin, cc2 total cost %,\n[inter lcu bank fx], [transparent], [Standard Note], [note2],\n[receiving network coverage], [pickup location], [pickup method], date, corridor\n```\nCorridor encoding: `source_code`/`destination_code` are ISO 3166-1 alpha-3; `corridor` is their concatenation (`'AGONAM'`). One **row = provider × corridor × quarter × instrument combination** (e.g. Western Union AGO→NAM Cash Q3-2025). `firm` is a display name (\"Western Union\", \"MoneyGram\"); `firm_type` ∈ {Bank, Money Transfer Operator, …}.\n\n**Amounts/instruments are COLUMNS, instruments are ROWS.** The two surveyed amounts sit side-by-side as parallel column blocks: `cc1` = USD **200**, `cc2` = USD **500** (`ccX denomination amount`). Each block carries the amount in local currency, the fee in LCU, the RSP-applied FX rate, the FX margin (%), and total cost (%). There are **only two amount tiers — no $200/$500 rows duplication, and no separate mobile-money price columns.** Payment channel is a row attribute: `[payment instrument]` is a free-form comma-separated string (26 distinct combos observed: `'Cash'`, `'Bank account transfer'`, `'Cash,Mobile money'`, `'Bank account transfer,Cash'`, …), so cash vs bank-account vs mobile prices appear as **separate rows** for the same provider/corridor/quarter when offered. Related attributes: `[access point]`, `[speed actual]`, `[receiving network coverage]`, `[pickup location]`, `[pickup method]`, collection `date` (datetime), `[transparent]` yes/no.\n\nCost math (verified numerically on sample rows): **`total cost % = (lcu fee / lcu amount × 100) + fx margin`** — e.g. fee 2257.2 AOA on 33,000 AOA = 6.84% + 3.10% margin = 9.94% stated. The interbank rate (`inter lcu bank fx`) is what the RSP rate is compared against. **Non-transparent providers**: `[transparent]='no'` ⇒ fx margin stored as 0 with note \"the exchange rate applied… was not disclosed… 0% does NOT necessarily mean that there is no exchange rate cost\"; the WB excludes these from its global average.\n\nLatest quarter cardinality (Q3-2025 block): 6,470 rows, ~400 distinct firms, ~348 distinct corridors (catalog metadata: 377 corridors, 48 sending / 111 receiving countries overall).\n\n**Legacy sheet `Dataset (up to Q1 2016)`**: 41 columns, 49,491 rows, 17 quarters `2011_1Q…2016_1Q`. Differs from current schema: has `product` (e.g. 'Cash to cash') + `sending location` instead of `payment instrument` + `access point`, and `pick-up method`/`coverage` naming. Needs its own parser/mapping.\n\n**Data-quality gotchas:** (a) Q3-2025 rows carry extra **unlabeled columns 43–47** (values like year `2025` and corridor-year keys `'AGO2025'`, `'AGO2026'`) — header stops at col 42 while the sheet reports max_column 74; expect drift in future releases. (b) `id` formats differ between sheets (small ints pre-2016 vs long numeric like `1212250001` after). (c) Instrument strings have inconsistent casing/variants ('Credit Card' vs 'Credit card'; 'Debit card' vs 'Debit/credit card') — normalization required. (d) 48 MB xlsx whose main sheet XML alone uncompresses to 298 MB — stream it (`openpyxl read_only=True`) or convert to Parquet/CSV once.\n\nAlternative programmatic access: World Bank DataBank source [\"Remittance Prices Worldwide (Corridors)\"](https://databank.worldbank.org/source/remittance-prices-worldwide-(corridors)) and WDI indicator `SI.RMT.COST.IB.ZS`.\n\n## 3. License / redistribution\nThe catalog labels this dataset **CC BY 4.0** (default license for WB-produced open data): sharing/adaptation for any purpose including commercial, with attribution + change indication, plus a mandatory mediation→arbitration dispute clause ([public-licenses](https://datacatalog.worldbank.org/public-licenses)). The WB [Terms of Use for Datasets](https://www.worldbank.org/ext/en/legal/terms-conditions/datasets) state datasets are CC BY 4.0 unless labeled otherwise, you may \"extract, download, copy, and share data with third parties, for commercial or noncommercial purposes, at no cost\", attribution format **\"The World Bank: Dataset name: Data source (if known)\"**, no implied WB endorsement. **Conclusion: an open-source project can republish parsed RPW data with attribution.** Caveat: the workbook's own 'Terms of Use' tab links three now-dead `go.worldbank.org` shorteners, one labeled \"Terms of use: Restricted Data\" — legacy boilerplate that conflicts with the catalog's CC BY 4.0 label; treat the catalog label as authoritative (flagged in risks).",
+      "facts": [
+        {
+          "fact": "The official RPW site remittanceprices.worldbank.org (homepage, /data-download, /resources, and all files under /sites/default/files/) returns HTTP 403 with header cf-mitigated:challenge (Cloudflare browser challenge) to non-browser clients including curl with a Chrome User-Agent.",
+          "source": "https://remittanceprices.worldbank.org/data-download"
+        },
+        {
+          "fact": "The latest confirmed quarterly release is Q3 2025, published as Issue No. 54 (September 2025); report PDF hosted at https://remittanceprices.worldbank.org/sites/default/files/2026-04/RPW_main_report_and_annex_Q325.pdf (itself Cloudflare-blocked for direct fetch). No Issue 55 / Q4-2025 release found on official channels as of 2026-08-22.",
+          "source": "https://remittanceprices.worldbank.org/resources"
+        },
+        {
+          "fact": "Programmatic mirror: World Bank Data Catalog dataset 0037898 'Remittance Prices Worldwide', version 6, metadata last updated 2026-05-06; resources: Complete Dataset Excel (48.4 MB, updated 2026-05-05) and Quarterly Report PDF (updated 2026-04-17).",
+          "source": "https://datacatalog.worldbank.org/search/dataset/0037898/remittance-prices-worldwide"
+        },
+        {
+          "fact": "Verified working direct download (curl -L with browser UA, HTTP 200, 50,762,620 bytes, 'Microsoft Excel 2007+'): https://datacatalogfiles.worldbank.org/ddh-published/0037898/DR0095523/rpw_dataset_2011_2025_q3.xlsx",
+          "source": "https://datacatalog.worldbank.org/search/dataset/0037898/remittance-prices-worldwide"
+        },
+        {
+          "fact": "Quarterly report PDF mirror (not fetched, listed by catalog): https://datacatalogfiles.worldbank.org/ddh-published/0037898/DR0095413/RPW_main_report_and_annex_Q325.pdf",
+          "source": "https://datacatalog.worldbank.org/search/dataset/0037898/remittance-prices-worldwide"
+        },
+        {
+          "fact": "Workbook contains exactly 6 sheets: 'Terms of Use', 'Methodology' (empty), 'Legend' (data dictionary), 'Countries' (header row 2; ISO3 code/name/region/income/lending/G8G20; ~215 country rows), 'Dataset (up to Q1 2016)', 'Dataset (from Q2 2016).'",
+          "source": "/tmp/rpw_dataset.xlsx (downloaded from https://datacatalogfiles.worldbank.org/ddh-published/0037898/DR0095523/rpw_dataset_2011_2025_q3.xlsx)"
+        },
+        {
+          "fact": "Main sheet 'Dataset (from Q2 2016)': single header row, exactly 42 named columns, 204,469 data rows, covering 37 quarters 2016_2Q through 2025_3Q; quarter 2025_2Q is absent entirely (no collection round).",
+          "source": "/tmp/rpw_dataset.xlsx sheet 'Dataset (from Q2 2016)'"
+        },
+        {
+          "fact": "Exact header order of the main sheet: id, period, source_code, source_name, source_region, source_income, source_lending, source_G8G20, destination_code, destination_name, destination_region, destination_income, destination_lending, destination_G8G20, firm, firm_type, 'payment instrument', 'access point', 'speed actual', cc1 lcu amount, cc1 denomination amount, cc1 lcu code, cc1 lcu fee, cc1 lcu fx rate, cc1 fx margin, cc1 total cost %, cc2 lcu amount, cc2 denomination amount, cc2 lcu code, cc2 lcu fee, cc2 lcu fx rate, cc2 fx margin, cc2 total cost %, inter lcu bank fx, transparent, Standard Note, note2, receiving network coverage, pickup location, pickup method, date, corridor.",
+          "source": "/tmp/rpw_dataset.xlsx sheet 'Dataset (from Q2 2016)' row 1"
+        },
+        {
+          "fact": "Corridors encoded as ISO 3166-1 alpha-3 codes in source_code/destination_code plus a concatenated corridor key (e.g. AGO->NAM gives corridor='AGONAM'); period format 'YYYY_QQ' (e.g. '2025_3Q'); date is the collection date as datetime; one row = one provider x corridor x quarter x payment-instrument offering.",
+          "source": "/tmp/rpw_dataset.xlsx sheet 'Dataset (from Q2 2016)' sample rows"
+        },
+        {
+          "fact": "The two surveyed amounts are SEPARATE COLUMN BLOCKS, not separate rows: cc1 = USD 200 and cc2 = USD 500 ('ccX denomination amount'), each with lcu amount, lcu fee, lcu fx rate, fx margin (%) and total cost %. There is no third amount tier.",
+          "source": "/tmp/rpw_dataset.xlsx sheet 'Dataset (from Q2 2016)' + 'Legend' sheet"
+        },
+        {
+          "fact": "Payment instrument is a ROW-level attribute and a comma-separated free-form string (26 distinct combinations observed, e.g. 'Cash', 'Bank account transfer', 'Cash,Mobile money', 'Bank account transfer,Cash'); bank-account vs cash vs mobile-money pricing therefore appear as different rows, not different columns; casing is inconsistent ('Credit Card' vs 'Credit card').",
+          "source": "/tmp/rpw_dataset.xlsx sheet 'Dataset (from Q2 2016)' distinct values of column 17"
+        },
+        {
+          "fact": "Total cost % decomposes as fee-percentage plus FX margin: verified example fee 2257.2 AOA on 33000 AOA = 6.84% + fx margin 3.1 = stated 'cc1 total cost %' 9.94. Fee-only share must be derived as lcu_fee / lcu_amount.",
+          "source": "/tmp/rpw_dataset.xlsx row for id 1212250001 (Western Union, AGO->NAM, 2025_3Q)"
+        },
+        {
+          "fact": "'transparent' flag: services where the exchange rate was not disclosed get transparent='no' and fx margin stored as 0, with an explicit note that 0% 'does NOT necessarily mean that there is no exchange rate cost'; the World Bank excludes these non-transparent services from its global average total cost.",
+          "source": "/tmp/rpw_dataset.xlsx 'Legend' sheet and Standard Note text in data rows"
+        },
+        {
+          "fact": "Data anomaly in the newest quarter: rows for 2025_3Q (exactly 6,470 rows starting at sheet row 198001) carry additional UNLABELED values in columns 43-47 (year 2025 and corridor-year keys like 'AGO2025', 'NAM2025', 'AGO2026') while the header ends at column 42; openpyxl reports max_column=74 for the sheet.",
+          "source": "/tmp/rpw_dataset.xlsx sheet 'Dataset (from Q2 2016)'"
+        },
+        {
+          "fact": "Q3-2025 quarter block: 6,470 rows, ~400 distinct firms, ~348 distinct sender-receiver corridor pairs; catalog metadata describes coverage of 377 corridors across 48 sending and 111 receiving countries.",
+          "source": "/tmp/rpw_dataset.xlsx + https://datacatalog.worldbank.org/search/dataset/0037898/remittance-prices-worldwide"
+        },
+        {
+          "fact": "Legacy sheet 'Dataset (up to Q1 2016)': 41 columns, 49,491 rows, 17 quarters 2011_1Q..2016_1Q; uses old taxonomy columns 'product' (e.g. 'Cash to cash') and 'sending location' instead of 'payment instrument'/'access point', and 'pick-up method'/'coverage' names; ids are small integers unlike post-2016 long numeric ids.",
+          "source": "/tmp/rpw_dataset.xlsx sheet 'Dataset (up to Q1 2016)'"
+        },
+        {
+          "fact": "The workbook's 'Terms of Use' tab contains only three reference lines ('Terms of use: Restricted Data', 'Terms of use for datasets', 'World Bank Terms and Conditions') hyperlinked to go.worldbank.org short URLs (R6942GMMH0, OJC02YMLA0, C09SUA7BK0) which no longer resolve (DNS dead).",
+          "source": "/tmp/rpw_dataset.xlsx xl/worksheets/sheet1.xml + _rels/sheet1.xml.rels"
+        },
+        {
+          "fact": "License: the catalog labels the dataset Creative Commons Attribution 4.0 (CC BY 4.0), which 'allows users to copy, modify and distribute data in any format for any purpose, including commercial use' subject to appropriate credit and indicating changes; CC BY 4.0 datasets also carry mandatory mediation-then-arbitration dispute terms.",
+          "source": "https://datacatalog.worldbank.org/public-licenses"
+        },
+        {
+          "fact": "World Bank Terms of Use for Datasets: unless labeled otherwise, Data Catalog datasets are CC BY 4.0; users may 'extract, download, copy, and share data with third parties, for commercial or noncommercial purposes, at no cost'; required attribution format 'The World Bank: Dataset name: Data source (if known)'; users may not imply World Bank endorsement; some third-party-provided datasets restrict redistribution and are flagged in metadata (this one is not flagged as restricted).",
+          "source": "https://www.worldbank.org/ext/en/legal/terms-conditions/datasets"
+        },
+        {
+          "fact": "Alternative programmatic access channel: World Bank DataBank source 'Remittance Prices Worldwide (Corridors)' offers interactive query/export; WDI indicator SI.RMT.COST.IB.ZS (cost of sending $200) is derived from RPW quarterly collections.",
+          "source": "https://databanks.worldbank.org/source/remittance-prices-worldwide-(corridors)"
+        }
+      ],
+      "risks": [
+        "Hardcoding the datacatalogfiles.worldbank.org URL will break: the resource ID path segment (DR0095523) and filename (rpw_dataset_2011_2025_q3.xlsx) change each release. The pipeline should resolve the current link from the catalog dataset page (0037898) each run; the old DKAN metastore API v1 (/api/1/metastore/...) returned 404/non-JSON during testing, so metadata discovery likely needs HTML scraping or the catalog's newer JSON:API.",
+        "Do not ingest from remittanceprices.worldbank.org directly: every page and file is gated by a Cloudflare browser challenge (403 cf-mitigated) regardless of User-Agent, so automated downloads there will fail.",
+        "Schema drift is real and already present: Q3-2025 rows contain unlabeled values in columns 43-47 beyond the 42-column header. Parsers should read by header-name position, tolerate trailing unnamed columns, and diff headers on every new release before overwriting downstream tables.",
+        "Do not assume a contiguous quarterly series: 2025_2Q is missing from the dataset (no collection round), and pre-2016 data lives in a structurally different second sheet ('product'/'sending location' vs 'payment instrument'/'access point'). Two parsers or an explicit field mapping are needed for full 2011-present history.",
+        "FX-margin handling is a correctness trap: transparent='no' rows hardcode fx margin to 0 even though a hidden FX cost may exist, and the World Bank itself excludes these rows from its global averages. A comparator must either exclude them or flag them, never average them as zero-FX-cost services.",
+        "payment instrument is a dirty comma-separated free-text field with inconsistent casing and near-duplicate categories ('Debit card' vs 'Debit/credit card', 'Credit Card' vs 'Credit card'); building clean bank-account/cash/mobile-money slices requires a normalization dictionary, and some offerings span multiple instruments in one row (fee may differ per instrument but is reported once per row).",
+        "Licensing ambiguity worth documenting: the embedded 'Terms of Use' tab still says 'Restricted Data' via dead go.worldbank.org shortlinks, while the catalog labels the file CC BY 4.0. Republishing parsed data is supported by the catalog license and the Terms of Use for Datasets, but the README should cite the catalog page and required attribution string ('The World Bank: Remittance Prices Worldwide (RPW)') and note the no-endorsement clause.",
+        "File size/performance: the xlsx is 50.8 MB compressed and the main sheet's XML alone is 298 MB uncompressed; naive full-file loads will be slow/memory-heavy. Use openpyxl read_only=True streaming (verified to work) or cache a normalized Parquet/CSV artifact after first parse."
+      ]
+    },
+    "fx": {
+      "summary": "## Verified 2026 state of exchange-rate APIs (all tested live on 2026-08-22)\n\n### Recommendation\n- **PRIMARY: fawazahmed0/exchange-api** (successor of fawazahmed0/currency-api). Static JSON over CDN, **no key, no rate limits**, **341 currencies** (all corridors covered: INR, PHP, NGN, PKR, BDT, ETB, VND, KES, GHS, LKR, NPR, MMK, UZS...), **daily updates**, **data licensed CC0-1.0** — the only candidate whose license unambiguously permits redistributing raw and derived computed values at this coverage. Historical snapshots by date (`@2026-01-15`) work.\n  - URL pattern: `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@{latest|YYYY-MM-DD}/v1/currencies/usd.min.json`; official Cloudflare fallback: `https://{date}.currency-api.pages.dev/v1/{endpoint}` (README mandates implementing the fallback).\n- **FALLBACK: open.er-api.com/v6/latest/USD** — keyless, 166 fiat currencies, updates once/day (payload carries `time_last_update_utc`/`time_next_update_utc`). Caveat: terms require attribution AND forbid redistribution of the data — usable as a runtime fallback (caching explicitly permitted) but do not persist/republish its rates.\n- **TERTIARY / cross-check: Frankfurter (api.frankfurter.dev)** — no key, no quotas, MIT code, self-hostable via Docker. New **v2 API blends 84 central banks → 201 currencies** (per-rate dates differ by provider vintage); classic **v1 remains ECB-only (30 currencies)** and still works. Use `providers=ECB` for official reference rates, but that scope lacks NGN/PKR/BDT/ETB.\n- **ELIMINATED: exchangerate.host** — no longer keyless: `GET /live` returns HTTP 200 with `{\"success\":false,\"error\":{\"code\":101,\"type\":\"missing_access_key\"}}`. Now an apilayer/currencylayer product; free tier is **100 requests/month** (~168 currencies), paid from $14.99/mo.\n- **ECB direct feeds**: work keyless (`data-api.ecb.europa.eu/service/data/EXR/D.INR.EUR.SP00.A?format=csvdata`, fixed at 2:15 pm CET) but only ~29 currencies in the daily set — insufficient alone; good as an authoritative EUR anchor with explicit reuse terms (cite ECB, state modifications).\n\n### Architecture shape for 200+ corridors\nDaily job pulls `usd.min.json` (+ optional `eur.min.json`) from exchange-api → snapshot committed/stored with the embedded `date` field → compute cross rates locally → fallback chain jsDelivr → pages.dev → open.er-api.com → Frankfurter v2. All sources are mid-market reference rates, not consumer remittance rates — fine for computing FX-margin comparisons, say so in the ADR.\n\n### Key gotchas found during verification\n- The old repo README (fawazahmed0/currency-api, branch `main`) is just a migration banner pointing to fawazahmed0/exchange-api and MIGRATION.md (URL changed from `/gh/fawazahmed0/currency-api@1/...` to `/npm/@fawazahmed0/currency-api@date/...`; response shape changed from `json[to]` to `json[from][to]`).\n- jsDelivr `@latest` lagged a day behind the pages.dev mirror today (2026-08-21 vs 2026-08-22) — always read the embedded `date`, never assume today.\n- Frankfurter's repo moved: `frankfurter-dev/frankfurter` 404s; canonical is `github.com/lineofflight/frankfurter` (MIT, active, pushed 2026-08-21).",
+      "facts": [
+        {
+          "fact": "Frankfurter requires no API key: 'It requires no API key' and 'There are no quotas. Requests are rate-limited to prevent abuse, but there are no monthly or daily caps.'",
+          "source": "https://frankfurter.dev/"
+        },
+        {
+          "fact": "Frankfurter v2 serves 201 currencies blended from 84 central-bank providers; /v2/currencies?scope=all returned exactly 201 entries and /v2/providers returned 84 providers.",
+          "source": "https://api.frankfurter.dev/v2/currencies?scope=all ; https://api.frankfurter.dev/v2/providers"
+        },
+        {
+          "fact": "Frankfurter v2 endpoints: /v2/rates?base=X&quotes=Y (array of {date,base,quote,rate}), time-series via from/to with group=week|month, single pair /v2/rate/EUR/USD, /v2/currencies, /v2/currency/{code}, CSV (.csv suffix/Accept header) and NDJSON streaming output; per-provider filtering via providers=ECB.",
+          "source": "https://frankfurter.dev/"
+        },
+        {
+          "fact": "Frankfurter classic v1 API still live and ECB-only: /v1/currencies returns exactly 30 currencies; /v1/latest?base=USD&symbols=INR returned {\"INR\":95.7,\"date\":\"2026-08-21\"}.",
+          "source": "https://api.frankfurter.dev/v1/currencies"
+        },
+        {
+          "fact": "Frankfurter's ECB-scoped v2 query covers only ECB-published pairs: ?providers=ECB&quotes=INR,PHP,NGN returned INR and PHP but no NGN (the ECB provider entry lists 47 codes incl. legacy; current daily eurofxref set is 29).",
+          "source": "https://api.frankfurter.dev/v2/rates?base=USD&quotes=INR,PHP,NGN&providers=ECB ; https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
+        },
+        {
+          "fact": "Frankfurter code is MIT-licensed, actively maintained (pushed 2026-08-21), self-hostable via Docker; FAQ on commercial use: 'Yes, absolutely. See each provider's terms for details on the underlying data.' Repo is github.com/lineofflight/frankfurter (old frankfurter-dev/frankfurter now 404s).",
+          "source": "https://api.github.com/repos/lineofflight/frankfurter ; https://frankfurter.dev/"
+        },
+        {
+          "fact": "exchangerate.host no longer works without a key: api.exchangerate.host/live returns HTTP 200 body {\"success\":false,\"error\":{\"code\":101,\"type\":\"missing_access_key\",\"info\":\"You have not supplied an API Access Key. [Required format: access_key=YOUR_ACCESS_KEY]\"}}; the old /latest path 404s to a currencylayer-branded page.",
+          "source": "https://api.exchangerate.host/live (live request 2026-08-22)"
+        },
+        {
+          "fact": "exchangerate.host pricing: free tier '100 Monthly Request', paid from '$14.99/monthly' starting at 10,000 requests/month, ~168 currencies advertised.",
+          "source": "https://exchangerate.host/"
+        },
+        {
+          "fact": "fawazahmed0/currency-api has migrated: its main-branch README is a banner reading 'THIS REPOSITORY IS MIGRATED TO https://github.com/fawazahmed0/exchange-api'; the repo itself was last pushed 2025-07-29.",
+          "source": "https://raw.githubusercontent.com/fawazahmed0/currency-api/main/README.md ; https://api.github.com/repos/fawazahmed0/currency-api"
+        },
+        {
+          "fact": "exchange-api (new home) is CC0-1.0 licensed and active (pushed 2026-08-20); README features: 'No Rate limits', '200+ Currencies, Including Common Cryptocurrencies & Metals', 'Daily Updated'.",
+          "source": "https://github.com/fawazahmed0/exchange-api ; https://api.github.com/repos/fawazahmed0/exchange-api/license"
+        },
+        {
+          "fact": "exchange-api access method is static CDN files with no key: https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@{date|latest}/v1/currencies/{code}.min.json with mandated Cloudflare fallback https://{date}.currency-api.pages.dev/v1/{endpoint} ('Please include Fallback mechanism in your code').",
+          "source": "https://github.com/fawazahmed0/exchange-api/blob/main/MIGRATION.md and README"
+        },
+        {
+          "fact": "Live test 2026-08-22: jsDelivr usd.min.json returned date 2026-08-21 with 340 rate keys; pages.dev returned date 2026-08-22 with 341 keys; currencies.json lists 341 codes; all of inr, php, ngn, pkr, bdt, etb, aed, vnd, kes, ghs, lkr, npr, mmk, uzs, kgs, tjs present. Dated historical URL (@2026-01-15) also resolves.",
+          "source": "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json ; https://latest.currency-api.pages.dev/v1/currencies/usd.json"
+        },
+        {
+          "fact": "open.er-api.com works keyless: result=success, base USD, 166 rates, payload shows daily cadence (time_last_update_utc 'Sat, 22 Aug 2026', time_next_update 'Sun, 23 Aug 2026') plus documentation/terms links in-band.",
+          "source": "https://open.er-api.com/v6/latest/USD"
+        },
+        {
+          "fact": "ExchangeRate-API open endpoint terms: 'requires attribution. You're welcome to cache the data we respond with ... You are, however, not allowed to re-distribute it.' Updates once per day; rate limited with HTTP 429 and a 20-minute cooldown; suggested usage 1 request/24h (or hourly). Required attribution: <a href=\"https://www.exchangerate-api.com\">Rates By Exchange Rate API</a>.",
+          "source": "https://www.exchangerate-api.com/docs/free"
+        },
+        {
+          "fact": "ECB data portal SDMX API works keyless with CSV output: EXR/D.USD.EUR.SP00.A last obs = 1.1699 on 2026-08-21, titled 'ECB reference exchange rate, US dollar/Euro, 2.15 pm (C.E.T.)'; same query works for INR (111.9595/EUR).",
+          "source": "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?lastNObservations=1&format=csvdata"
+        },
+        {
+          "fact": "Legacy ECB eurofxref-daily.xml still publishes 29 currencies (AUD BRL CAD CHF CNY CZK DKK GBP HKD HUF IDR ILS INR ISK JPY KRW MXN MYR NOK NZD PHP PLN RON SEK SGD THB TRY USD ZAR) — no NGN, PKR, BDT or ETB, so ECB alone cannot cover the target corridors.",
+          "source": "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
+        },
+        {
+          "fact": "ECB reuse terms: users may make free use of information subject to conditions — accurate reproduction with 'the ECB must be cited as the source', buyers of paid documents must be told the info is free on the ECB site, and 'If the information is modified by the user ... this must be stated explicitly'.",
+          "source": "https://www.ecb.europa.eu/services/using-our-site/disclaimer/html/index.en.html"
+        }
+      ],
+      "risks": [
+        "Single-maintainer risk: exchange-api is essentially one person's project and has already broken consumers once via the 2024 migration from GitHub-CDN to npm-CDN URLs (documented in issue #89 / MIGRATION.md). Mitigation: implement the documented jsDelivr -> pages.dev dual-CDN fallback, snapshot every pull into your own store/repo so the app never hard-depends on the CDN.",
+        "CDN staleness skew: on 2026-08-22 jsDelivr @latest served the 2026-08-21 dataset while pages.dev served 2026-08-22 — 'latest' is not guaranteed fresh-today. Always read the embedded `date` field and surface it in the UI/ADR rather than assuming publication day.",
+        "Licensing asymmetry: open.er-api.com explicitly forbids redistribution of its data. Safe as a runtime fallback only (terms permit caching); do not commit its raw rates anywhere public, and keep attribution visible whenever it is the serving source.",
+        "Frankfurter v2's 201-currency blend aggregates 84 central banks with different fixings and vintages (same response contained ARS dated 2026-08-21 and AMD dated 2026-08-22), so cross-corridor comparisons can silently mix rate dates. If you need official-reference-rate consistency you must scope providers=ECB, which collapses coverage back to ~29-30 currencies and loses NGN/PKR/BDT/ETB.",
+        "Repo/doc instability: Frankfurter's canonical repo moved (frankfurter-dev/frankfurter now 404s; lineofflight/frankfurter is canonical), and currency-api's canonical location moved once already. Pin URLs by version/date where possible and monitor both repos.",
+        "Coverage gaps if you lean on official sources: ECB daily set is 29 currencies and exchangerate.host is effectively paywalled (100 req/mo free), so broad emerging-market corridor coverage (NGN, PKR, BDT, ETB) realistically forces the CC0 community dataset as primary.",
+        "Mid-market caveat: every candidate publishes interbank/reference mid rates, not consumer remittance rates. Corridor cost outputs derived from them are valid as indicative FX-margin estimates but will diverge from actual provider quotes; state this limitation explicitly in the ADR."
+      ]
+    },
+    "art": {
+      "summary": "## Prior-art sweep: open-source remittance-cost comparator\n\n### 1. GitHub open-source landscape — no notable project exists\nVerified via GitHub REST API (`gh` CLI + api.github.com) across queries: \"remittance comparison\", \"remittance price\", \"send money comparison\", \"money transfer comparison\", \"world bank remittance\", \"exchange rate margin\", topic:remittance, topic:money-transfer, sorted by stars. **Nothing above 15 stars; the entire niche is 0–1-star hobby projects.** The most relevant:\n\n| Repo | Stars | What it actually does | Status |\n|---|---|---|---|\n| [ilyabo/remittances](https://github.com/ilyabo/remittances) | 15 | Interactive D3-style map of world remittance **flows** (volumes), not prices | Last pushed 2018, dead |\n| [coinnect-dev/coinnect](https://github.com/coinnect-dev/coinnect) | 6, MIT | Cheapest multi-hop *routing* engine (USD→USDC→NGN via Kraken/Yellow Card); public quote API at coinnect.bot | Adjacent problem (crypto path-finding, not provider fee/FX-margin ranking); active Mar–May 2026 |\n| [ManuelBv/remittance-price-comparison](https://github.com/ManuelBv/remittance-price-comparison) | 0 | **Conceptually closest**: ad-hoc internal page comparing Remitly/Wise/WorldRemit/Xoom ranked by \"true cost to recipient\" revealing hidden FX markup | Only Wise integration is real; other three providers are synthetic stubs because their calculators are JS-rendered with no documented API; no license |\n| [agc000/remittance-comparison-api](https://github.com/agc000/remittance-comparison-api) | 0 | Backend-only FastAPI \"true cost\" comparator with quote-snapshot data model | Concept/design stage, seed scripts only, no live data source wired |\n| [dominicrobinson-oss/money-transfer-comparison](https://github.com/dominicrobinson-oss/money-transfer-comparison) | 1 | Next.js PWA comparing one corridor (GBP→NGN), redirects users to provider sites | Single-corridor, lead-gen-shaped |\n| [worldbank/RemittancePricesWorldwide](https://github.com/worldbank/RemittancePricesWorldwide) | 0 | Supposedly the RPW database on GitHub | **Empty** — README-only placeholder (84 bytes), created/pushed Nov 2024, no license, no data files |\n| Others (all 0★) | — | Corridor-specific hobby apps: ShubhamRathour123/trueremittance (UAE→India), ds87871/remivo (Indians abroad), SendbetterZw (Zimbabwe), OFW tools, SegunAdewola/remit-track (African diaspora, Go), jkim1285/TransferIQ, drakeshnag-rjo/what-that-transfer-cost (extracts hidden FX margin from a receipt screenshot) | Fragmented, unmaintained |\n\n### 2. World Bank's own consumer-facing tool — yes, it exists\n- **[remittanceprices.worldbank.org](https://remittanceprices.worldbank.org/)** is the WB's consumer-facing interactive tool with a \"**Find and Compare Prices**\" feature covering ~48 sending → ~105 receiving countries (~367 corridors); global average cost 6.36% per the Sept 2025 report (per search-result descriptions of the site; it sits behind Cloudflare and returned HTTP 403 to direct fetch, so feature wording is second-hand).\n- The underlying dataset is genuinely open: [World Bank Data Catalog entry 0037898](https://datacatalog.worldbank.org/search/dataset/0037898/remittance-prices-worldwide) — **CC BY 4.0**, complete-dataset Excel ~48.4 MB (updated May 2026), plus DataBank views (Sending Countries / Receiving Countries / Corridors) and quarterly PDF reports; coverage stated as **377 country corridors, 48 sending, 111 receiving countries**. Prices are **quarterly mystery-shopped snapshots at $200 and $500 reference amounts** — not real-time quotes.\n- Critically, I tested the machine-readable route: the [World Bank API](https://api.worldbank.org/v2/sources?format=json&per_page=100) carries RPW only as **source 76** (\"Sending Countries\") and **source 77** (\"Receiving Countries\") with a single aggregate indicator `SI.RMT.COST.OB.ZS`, and its copy is **stale — `lastupdated: 2020-12-07`** (USA's newest observation is 2020Q3 = 5.14%, verified by direct query). There is **no corridor-level source in the API at all**. So current corridor/provider data is Excel-download-only.\n\n### 3. Commercial comparators\n- **[Monito](https://www.monito.com/en/wiki/why-you-can-trust-monito)** — the category leader (\"Booking.com for money transfers\"). Business model: **affiliate referral commissions** when users complete transfers with listed providers (Wise, Remitly, Western Union…), plus advertising/paid \"Partner Spotlights\" and historically B2B pricing-data subscriptions. Claims independence via a proprietary \"Monito Score\". Coverage: current site says **200+ providers / 154 countries**; older sources cite 400–456+ providers across 190–195 countries. Data closed — no public dataset or API.\n- **[CompareRemit](https://www.compareremit.com/)** — founded 2013, Santa Clara CA, owned by Path2usa.com Inc. Standard **affiliate/marketplace lead-gen model**: free consumer tool, revenue from partnered providers (Xoom, Remitly…) whose real-time rates it displays, plus exclusive coupon deals. Coverage is deliberately narrow diaspora corridors: US/UK/CA/AU → India, Philippines, Pakistan, Bangladesh, Nepal, Mexico, Sri Lanka.\n- **Wise comparison pages ([wise.com/us/compare](https://wise.com/us/compare/disclaimer))** — the notable outlier: Wise explicitly discloses it takes **no commissions** for comparison-table placements (\"we're not a price comparison website\") and labels the tables \"**for marketing purposes only**\". Methodology (from their own disclaimer): quotes hand-collected from provider websites on specific dates, **mystery-shopped up to payment where fees aren't public**, FX recorded as markup vs Bloomberg mid-market then re-applied to the live mid rate. Self-interested rather than affiliate-biased; data not published as a reusable open dataset (third-party sites reportedly hit Wise's comparison API unofficially). Edge case: Wise owns affiliate comparison site [Exiap](https://www.exiap.com/guides/remitly-vs-xe-vs-wise).\n\n### 4. Conclusion — the gap, and what to avoid\n**The gap this project fills:** there is no maintained, open-source, **API-first** comparator that (a) ingests the World Bank's CC-BY-4.0 RPW data programmatically, (b) ranks providers by decomposed **true cost = explicit fee + hidden FX margin**, (c) carries a zero-affiliate funding model with published methodology, and (d) exposes the result through a public API. Every existing asset fails on at least two of these four: the World Bank has the open data and a consumer UI but **no working API (stale since Dec 2020) and no machine-readable corridor feed**; its own GitHub repo is an empty placeholder; commercial comparators are affiliate-monetized (Monito, CompareRemit) or marketing-owned (Wise) with closed data; and every OSS attempt is a 0-star, single-corridor or stubbed hobby project (ManuelBv's repo even documents being blocked by providers' JS-only quote pages). A credible, attributable, refreshable open pipeline + API over RPW is genuinely unoccupied territory.\n\n**Must avoid:**\n- Do **not** scrape Monito, CompareRemit, or Wise comparison pages: their terms prohibit scraping, both comparator sites sit behind Cloudflare bot protection (verified 403s), and Wise's table is its own copyrighted marketing compilation. Build solely from WB open data + official/authorized provider quote APIs.\n- Do **not** reverse-engineer undocumented provider quote endpoints (Remitly/WorldRemit/Xoom render prices client-side precisely to prevent this — ManuelBv's README records this exact wall). Check each provider's ToS/API terms before any integration; Wise's quote API is the one documented candidate.\n- Label data freshness honestly: RPW figures are **quarterly mystery-shopped snapshots for $200/$500 transfers**, never real-time quotes — presenting them as live would be the same misleading pattern the project criticizes.\n- License hygiene: CC BY 4.0 requires visible attribution to the World Bank RPW dataset; choose an OSI license for your own code (most failed prior art have none); avoid implying endorsement by or partnership with named providers/trademarks.\n- Independence must be structural and disclosed: the moment any provider pays for placement, the project collapses into what it critiques — commit to a no-paid-placement charter in the framing doc.",
+      "facts": [
+        {
+          "fact": "No open-source remittance price-comparison project on GitHub exceeds 15 stars; the niche consists entirely of 0–1-star hobby projects (verified via GitHub search API across 9 query angles and direct repo API lookups).",
+          "source": "https://api.github.com/search/repositories?q=remittance+comparison"
+        },
+        {
+          "fact": "worldbank/RemittancePricesWorldwide on GitHub is an empty placeholder: README-only (84 bytes), 0 stars, 0 forks, no license file, created/pushed 2024-11-11.",
+          "source": "https://api.github.com/repos/worldbank/RemittancePricesWorldwide"
+        },
+        {
+          "fact": "The World Bank publishes a consumer-facing interactive tool at remittanceprices.worldbank.org with a 'Find and Compare Prices' feature (~48 sending countries, ~105 receiving countries, ~367 corridors; global average cost 6.36% per Sept 2025 report) — per search-result descriptions; the site returned HTTP 403 (Cloudflare) to direct fetch, so wording is second-hand.",
+          "source": "https://remittanceprices.worldbank.org/"
+        },
+        {
+          "fact": "RPW data is openly licensed CC BY 4.0 via World Bank Data Catalog entry 0037898: complete-dataset Excel ~48.4 MB updated May 2026, quarterly PDF report, and three DataBank views (Sending/Receiving Countries, Corridors); stated coverage 377 country corridors, 48 sending countries, 111 receiving countries.",
+          "source": "https://datacatalog.worldbank.org/search/dataset/0037898/remittance-prices-worldwide"
+        },
+        {
+          "fact": "VERIFIED BY DIRECT API CALL: the World Bank API carries RPW only as source 76 ('Sending Countries') and source 77 ('Receiving Countries'); indicator SI.RMT.COST.OB.ZS shows lastupdated 2020-12-07 with USA's newest observation 2020Q3 (5.14%) — the API copy of RPW is roughly six years stale, and no corridor-level source exists in the API.",
+          "source": "https://api.worldbank.org/v2/country/USA/indicator/SI.RMT.COST.OB.ZS?format=json"
+        },
+        {
+          "fact": "RPW prices are quarterly mystery-shopped snapshots collected for USD 200 and USD 500 reference transfers across four provider types (banks, MTOs, mobile operators, post offices) — not real-time quotes.",
+          "source": "https://remittanceprices.worldbank.org/about-remittance-prices-worldwide"
+        },
+        {
+          "fact": "Monito monetizes via affiliate referral commissions from listed providers plus advertising/paid Partner Spotlights (and historically B2B data subscriptions), claiming rankings are governed by its independent 'Monito Score'; current site claims 200+ providers compared across 154 countries while older profiles cite 400–456+ providers across 190–195 countries (figures vary by source/date).",
+          "source": "https://www.monito.com/en/wiki/why-you-can-trust-monito"
+        },
+        {
+          "fact": "CompareRemit (founded 2013, owned by Path2usa.com Inc., Santa Clara CA) uses an affiliate/marketplace lead-gen model: free consumer comparison funded by partnered providers (Xoom, Remitly) plus exclusive coupon deals; coverage limited to US/UK/Canada/Australia sending to India, Philippines, Pakistan, Bangladesh, Nepal, Mexico, Sri Lanka.",
+          "source": "https://www.compareremit.com/"
+        },
+        {
+          "fact": "Wise's comparison pages disclose they receive NO commissions for featuring providers ('we're not a price comparison website') and label tables 'for marketing purposes only'; methodology involves hand-collected quotes, mystery-shopping where fees are non-public, and FX markups measured against Bloomberg mid-market rate.",
+          "source": "https://wise.com/us/compare/disclaimer"
+        },
+        {
+          "fact": "Exiap, an affiliate-link money-transfer comparison site, is owned by Wise — an edge case showing even 'no-commission' comparators can be structurally self-interested.",
+          "source": "https://www.exiap.com/guides/remitly-vs-xe-vs-wise"
+        },
+        {
+          "fact": "ManuelBv/remittance-price-comparison (0 stars, no license) is the conceptually closest prior art: it ranks providers by 'true cost to the recipient' to reveal hidden FX markup, but only the Wise integration is real — Remitly, WorldRemit and Xoom return synthetic stub quotes because their calculators are JS-rendered with no documented public API.",
+          "source": "https://github.com/ManuelBv/remittance-price-comparison"
+        },
+        {
+          "fact": "coinnect-dev/coinnect (6 stars, MIT, active Mar–May 2026) is the closest actively-developed OSS effort but solves a different problem: cheapest multi-hop routing including crypto rails (e.g., USD→USDC→NGN via Kraken/Yellow Card) with a public quote API, not provider fee+FX-margin ranking from World Bank data.",
+          "source": "https://github.com/coinnect-dev/coinnect"
+        },
+        {
+          "fact": "ilyabo/remittances (15 stars) visualizes world remittance FLOWS (volumes) on an interactive map, not prices; untouched since 2018.",
+          "source": "https://github.com/ilyabo/remittances"
+        },
+        {
+          "fact": "Both Monito and remittanceprices.worldbank.org block automated fetching (HTTP 403 / Cloudflare JS challenge), confirming that neither comparator data nor the WB consumer tool is trivially scrapable.",
+          "source": "https://remittanceprices.worldbank.org/"
+        },
+        {
+          "fact": "ASSUMPTION (unverified): Monito's and CompareRemit's terms of service explicitly prohibit scraping — inferred from industry-standard ToS and observed bot-blocking, not read directly, since both sites block automated access.",
+          "source": "https://www.monito.com/en/wiki/why-you-can-trust-monito"
+        }
+      ],
+      "risks": [
+        "Scraping comparators is legally/technically blocked and ToS-hostile: Monito and the World Bank RPW site both returned HTTP 403 behind Cloudflare during this sweep. Any ingestion of Monito/CompareRemit/Wise page data would violate their terms and undermine the zero-bias positioning. Source data must come only from the CC BY 4.0 RPW downloads and authorized provider APIs.",
+        "Data-pipeline reality check: the World Bank API copy of RPW is stale (lastupdated 2020-12-07) and contains no corridor-level data — the project must parse the ~48 MB quarterly Excel file from the Data Catalog, which changes structure between releases; budget engineering time for a resilient parser rather than assuming a clean API.",
+        "Freshness mislabeling risk: RPW numbers are quarterly mystery-shopped snapshots at fixed $200/$500 amounts. Presenting them as live 'today's best rate' comparisons would replicate exactly the opacity the project critiques; the UI/API must carry explicit as-of dates and methodology notes.",
+        "Provider-integration trap: Remitly, WorldRemit and Xoom expose no documented public quote APIs (JS-rendered calculators), as documented first-hand in ManuelBv's README. Reverse-engineering private endpoints likely violates provider ToS and creates brittle dependencies; restrict integrations to officially documented APIs (Wise is the main viable one) and clearly mark unsupported providers.",
+        "License/attribution obligations: RPW is CC BY 4.0, requiring prominent attribution to the World Bank; the project's own code should carry an OSI-approved license — notably, nearly all failed prior art (including worldbank's own empty repo) shipped with none, which suppresses adoption and reuse.",
+        "Independence must be structural, not rhetorical: the defining wedge versus Monito/CompareRemit is zero paid placement. If any provider later pays for ranking influence, the differentiation collapses; write a binding no-paid-placement charter into the framing doc and governance before launch.",
+        "Coverage honesty: RPW covers 377 corridors for $200/$500 transfers and skews toward established MTO/bank/postal players; digital-first fintechs and newer corridors may be under-represented, so claims like 'all providers, all corridors' would overstate — scope the framing doc's claims to what the dataset supports."
+      ]
+    },
+    "stats": {
+      "summary": "## Verified market statistics (as of 2026-08-22)\n\n**1. Global remittance flows to LMICs**\n- Latest full-year estimate: **$685 billion expected for 2024 (+5.8% y/y, vs +1.2% in 2023)**; world total incl. high-income countries **$905 billion (2024e)** vs $865B in 2023. Source: World Bank People Move blog by Ratha/Plaza/Kim, **Dec 18, 2024** (verified directly): https://blogs.worldbank.org/en/peoplemove/in-2024--remittance-flows-to-low--and-middle-income-countries-ar\n- Prior full year (Brief 40, June 26, 2024 press release, verified directly): **$656B to LMICs in 2023 (+0.7%)**; 2024 projected +2.3%. https://www.worldbank.org/en/news/press-release/2024/06/26/remittances-slowed-in-2023-expected-to-grow-faster-in-2024\n- **CONFLICT TO RESOLVE:** A July 1, 2026 World Bank PSD blog (Ardic/Dashi) states \"Global remittance flows reached an estimated **$856 billion in 2024, with $653 billion flowing to low- and middle-income countries**\" (https://blogs.worldbank.org/en/psd/cutting-the-cost-of-sending-money-home--fast-payment-systems--di) — lower than the Dec 2024 estimates ($905B/$685B), apparently a revised data vintage. Pick one attribution explicitly; do not mix.\n- **NOT verifiable as of Aug 2026:** any official 2025 actuals or 2026 projections from World Bank/KNOMAD. No numbered Migration and Development Brief after Brief 40 (June 2024) could be confirmed; secondary sources disagree on whether a \"Brief 41\" exists (some date it Dec 2024). Cite blog posts/documents, not brief numbers >40.\n\n**2. India receipts**\n- World Bank (calendar 2024e): **India $129 billion — largest recipient**, followed by Mexico $68B and China $48B (Philippines $40B, Pakistan $33B). Margin over #2 Mexico ≈ **$61B (~1.9x)**. India has been the top recipient since 2008. Same Dec 18, 2024 blog.\n- RBI balance-of-payments (fiscal year Apr 2024–Mar 2025): record **$135.46 billion, +14%** — verified only via Indian press (Economic Times/Times of India, Aug 2025); fiscal-year basis, not comparable to WB calendar-year $129B.\n\n**3. Global average cost of sending $200 + SDG target**\n- **6.36% in Q3 2025** (down from 6.49% in Q1 2025), per **Remittance Prices Worldwide Issue 54, September 2025** — extracted from the primary PDF (32pp, via Wayback copy of remittanceprices.worldbank.org/sites/default/files/2026-04/RPW_main_report_and_annex_Q325.pdf). Below 7% since Q1 2019; was 9.67% in Q1 2009. Global SmaRT average 3.29%; International MTO index 5.52%. RPW homepage (\"last update Aug 18, 2025\") confirms 6.36% as the headline number as of May 2026 archive snapshot.\n- SDG target is **10.c** (deadline **2030**), exact wording verified at sdgs.un.org/goals/goal10: \"By 2030, reduce to less than 3 per cent the transaction costs of migrant remittances and eliminate remittance corridors with costs higher than 5 per cent.\" Indicator **10.c.1 = \"Remittance costs as a proportion of the amount remitted.\"** RPW Issue 54 itself tracks the \"UN SDGs and G20 target of 3 percent… by 2030.\"\n- **CORRECTION for your framing doc:** the 3% cost target is NOT indicator 17.3.1. Verified at sdgs.un.org/goals/goal17: **17.3.1 = \"Additional financial resources mobilized for developing countries from multiple sources\"**; remittances appear under **17.3.2** (\"Volume of remittances (in USD) as a proportion of total GDP\").\n\n**4. Channel cost gap (Q3 2025, RPW Issue 54 primary source)**\n- Digital remittances avg **4.59%** vs non-digital **7.30%** (~2.7 pp gap); digital = 35% of services collected. Digital-only MTOs **3.54%**. Banks are the most expensive provider type at **14.99%**. Credit/debit card cheapest origination instrument (4.39%). July 2026 WB blog rounds this as \"~4% digital vs ~7% cash-based.\"\n\n**5. Regional differences (Q3 2025, Table 5/key findings, RPW Issue 54)**\n- **Sub-Saharan Africa most expensive: 8.46%**; **South Asia 5.30%** (rose from 4.80%); MENA-Afghanistan & Pakistan became lowest-cost region at **5.11%**; EAP 5.83%; LAC 5.64%; ECA (excl. Russia) 6.80%. SSA is ~3.2 pp above South Asia (~60% higher).\n\n**6. International migrants**\n- **304 million international migrants in 2024 = 3.7% of world population**, nearly double 154M in 1990 (2.9%); Europe hosts 94M, Northern America 61M. Verified directly from UN DESA \"International Migrant Stock 2024: Key facts and figures,\" UN DESA/POP/2024/DC/NO. 13, January 2025 PDF. IOM's World Migration Report 2026 cites the same figure (site returned 403 on direct fetch; corroborated via search snippets).\n\n**Could NOT verify as of 2026-08-22:** any RPW quarter after Q3 2025/Issue 54 (site behind Cloudflare; Jul/Aug 2026 Wayback snapshots are 403; no Q4 2025/Q1 2026 issue found); any KNOMAD brief or WB aggregate covering 2025 actuals or 2026 forecasts; the widely-circulated \"$720B LMIC 2026 projection\" claim (appears fabricated in secondary aggregators — do not use); official WB confirmation that the KNOMAD brief series ended at 40.",
+      "facts": [
+        {
+          "fact": "Global average cost of sending $200 fell from 6.49% (Q1 2025) to 6.36% (Q3 2025); below 7% since Q1 2019 and down from 9.67% in Q1 2009.",
+          "source": "World Bank Remittance Prices Worldwide Issue 54, September 2025 (primary PDF, verified): https://remittanceprices.worldbank.org/sites/default/files/2026-04/RPW_main_report_and_annex_Q325.pdf"
+        },
+        {
+          "fact": "SDG target 10.c (2030 deadline) exact wording: 'By 2030, reduce to less than 3 per cent the transaction costs of migrant remittances and eliminate remittance corridors with costs higher than 5 per cent'; indicator 10.c.1 is 'Remittance costs as a proportion of the amount remitted'.",
+          "source": "https://sdgs.un.org/goals/goal10 (verified via direct fetch)"
+        },
+        {
+          "fact": "SDG indicator 17.3.1 is 'Additional financial resources mobilized for developing countries from multiple sources' — it is NOT the 3% remittance-cost target; remittance volume/GDP sits under 17.3.2. The 3%/2030 goal belongs to target 10.c / indicator 10.c.1.",
+          "source": "https://sdgs.un.org/goals/goal17 (verified via direct fetch)"
+        },
+        {
+          "fact": "Digital remittances averaged 4.59% vs non-digital 7.30% in Q3 2025 (digital = 35% of tracked services); banks were the most expensive channel at 14.99%; digital-only MTO index 3.54%; Global SmaRT average 3.29%.",
+          "source": "World Bank RPW Issue 54, September 2025 (primary PDF, verified)"
+        },
+        {
+          "fact": "Sub-Saharan Africa remained the most expensive receiving region at 8.46% in Q3 2025, versus South Asia at 5.30% (up from 4.80%); MENA-Afghanistan & Pakistan overtook South Asia as lowest-cost region at 5.11%; LAC 5.64%, EAP 5.83%, ECA excl. Russia 6.80%. 83% of corridors now cost under 5%.",
+          "source": "World Bank RPW Issue 54, September 2025, key findings and Table 5 (primary PDF, verified)"
+        },
+        {
+          "fact": "Remittances to low- and middle-income countries were expected to reach $685 billion in 2024 (+5.8% y/y, vs +1.2% in 2023); world total including high-income countries estimated at $905 billion in 2024 ($865B in 2023). Tajikistan is the most remittance-dependent economy at 45% of GDP.",
+          "source": "World Bank People Move blog, Dilip Ratha, Sonia Plaza, Eung Ju Kim, December 18, 2024 (verified): https://blogs.worldbank.org/en/peoplemove/in-2024--remittance-flows-to-low--and-middle-income-countries-ar"
+        },
+        {
+          "fact": "Revised/lower 2024 figures appear in a later World Bank post: 'Global remittance flows reached an estimated $856 billion in 2024, with $653 billion flowing to low- and middle-income countries', alongside digital costs '~4%' vs cash-based '~7%' and fast-payment-system existence cutting $200-transfer cost by 0.3–1 percentage point.",
+          "source": "World Bank Private Sector Development blog, Oya Ardic & Edlira Dashi, July 1, 2026 (verified): https://blogs.worldbank.org/en/psd/cutting-the-cost-of-sending-money-home--fast-payment-systems--di"
+        },
+        {
+          "fact": "India is the world's largest remittance recipient with an estimated $129 billion in calendar 2024, ahead of Mexico ($68B) and China ($48B); Philippines $40B, Pakistan $33B. Gap to #2 Mexico ≈ $61B (~1.9x).",
+          "source": "World Bank People Move blog, December 18, 2024 (verified); India top-recipient status since 2008 per World Bank data cited in Economic Times/Times of India coverage"
+        },
+        {
+          "fact": "India received a record $135.46 billion in remittances in fiscal year 2024-25 (April–March), up 14% year-on-year, more than double FY2016-17's $61B (RBI balance-of-payments data).",
+          "source": "RBI data as reported by Economic Times ('Diaspora remittances hit new record at $135.46 bn in FY25') and Times of India, August 2025 (secondary press; not independently verified against RBI)"
+        },
+        {
+          "fact": "Remittances to LMICs were $656 billion in 2023 (+0.7%), with 2024 growth projected at 2.3% at that time; regional 2023 totals: South Asia $186B, LAC $156B, EAP $85B, ECA $71B, MENA $55B, SSA $54B; India received $120B (+7.5%) and Mexico $66.2B (+7.8%) in 2023.",
+          "source": "World Bank press release accompanying Migration and Development Brief 40, June 26, 2024 (verified): https://www.worldbank.org/en/news/press-release/2024/06/26/remittances-slowed-in-2023-expected-to-grow-faster-in-2024"
+        },
+        {
+          "fact": "The number of international migrants worldwide stood at 304 million in 2024 (3.7% of global population), nearly double the 154 million in 1990 (2.9%); Europe hosted the most (94 million), Northern America second (61 million).",
+          "source": "UN DESA Population Division, International Migrant Stock 2024: Key facts and figures, UN DESA/POP/2024/DC/NO. 13, January 2025 (PDF downloaded and text-extracted): https://www.un.org/development/desa/pd/sites/www.un.org.development.desa.pd/files/undesa_pd_2025_intlmigstock_2024_key_facts_and_figures_advance-unedited.pdf"
+        },
+        {
+          "fact": "IOM's World Migration Report 2026 (released May 2026) cites the same migrant stock (~304 million by mid-2024, per UN DESA) and repeats 2024 remittance estimates of USD 905 billion globally / USD 685 billion to LMICs, exceeding ODA and FDI.",
+          "source": "https://worldmigrationreport.iom.int/what-we-do/world-migration-report-2026/chapter-2/international-migrants-numbers-and-trends (direct fetch blocked HTTP 403; content corroborated via web search snippets only)"
+        },
+        {
+          "fact": "As of the May 2, 2026 archived capture, the RPW website still headlined 6.36% (Q3 2025 report) with 'Last update: August 18, 2025' and listed 367 country corridors across 48 sending and 105 receiving countries.",
+          "source": "Wayback Machine capture of https://remittanceprices.worldbank.org/ dated 2026-05-02 (verified): http://web.archive.org/web/20260502085149/https://remittanceprices.worldbank.org/"
+        }
+      ],
+      "risks": [
+        "Indicator mislabeling in the task framing: the 3%-by-2030 remittance-cost target is SDG target 10.c / indicator 10.c.1, NOT indicator 17.3.1 (which measures additional financial resources mobilized). Landing-page copy must cite 10.c/10.c.1 or it will be indefensible.",
+        "Conflicting World Bank figures for 2024 flows: Dec 18, 2024 blog says $685B LMIC / $905B world, but the July 1, 2026 PSD blog says $653B LMIC / $856B world. Do not mix vintages; attribute each number to its specific dated source and prefer the most recent (July 2026) if a single figure is needed, noting the revision.",
+        "No post-2024 authoritative flow data could be verified: there is no confirmable Migration and Development Brief after Brief 40 (June 2024), no 2025 actuals, and no 2026 forecast from the World Bank/KNOMAD as of 2026-08-22. Secondary claims of a 'December 2025 Brief 41' with a '$720B 2026 projection' appear fabricated/hallucinated in aggregator sites and MUST NOT be used.",
+        "RPW currency risk: the latest citable quarter is Q3 2025 (Issue 54, September 2025). remittanceprices.worldbank.org is behind a Cloudflare challenge and July/August 2026 Wayback captures return 403, so a newer issue (Q4 2025/Q1 2026) may exist but could not be accessed. Phrase copy as 'latest available reading (Q3 2025)' rather than 'latest quarter'.",
+        "India figures come in two incompatible bases: World Bank calendar-2024 $129B vs RBI fiscal-year 2024-25 $135.46B (Apr–Mar). Mixing them in one comparison would be wrong. The $135.46B was also only verified through Indian press articles, not RBI directly.",
+        "Bank-channel figure of 14.99% (Q3 2025) is noticeably higher than older commonly-cited values (e.g., ~11.7% in 2023-era reports); older framing docs citing ~11-12% for banks are stale and should be updated.",
+        "Some search-result summaries contained internally inconsistent tables (e.g., 'Brief 41 December 2025' with 2025/2026 figures that duplicate 2024 numbers; a $913B world 2025 forecast attributed to Brief 40 that could not be confirmed in the press release itself). Only figures traced to the primary documents listed above should go on the landing page."
+      ]
+    }
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Research"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "rpw-data",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a7b97d40bd9a09c40",
+      "model": "stealth/ox-alpha",
+      "state": "done",
+      "startedAt": 1787377747980,
+      "queuedAt": 1787377747890,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "# World Bank Remittance Prices Worldwide (RPW) — ground tru…",
+      "promptPreview": "You are researching data sources for an open-source remittance-cost comparator. TASK: Establish ground truth about the World Bank's Remittance Prices Worldwide (RPW) database.\n\n1. Find the current official download page (try https://remittanceprices.worldbank.org). Identify the LATEST quarterly release (title/quarter/year) and its direct download URL (usually an .xlsx).\n2. Try to download it (curl…",
+      "lastProgressAt": 1787379212247,
+      "tokens": 37987,
+      "toolCalls": 29,
+      "durationMs": 1464260,
+      "resultPreview": "{\"summary\":\"# World Bank Remittance Prices Worldwide (RPW) — ground truth for ingestion\\n\\n## 1. Download page & latest release\\n- Official site `https://remittanceprices.worldbank.org` (+ `/data-download`, `/resources`) is behind a **Cloudflare JS challenge**: every page AND file under it returns **HTTP 403** (`cf-mitigated: challenge`) to curl/WebFetch even with a browser User-Agent. It is not u…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "fx-apis",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "aeffe9031c3003ba3",
+      "model": "stealth/ox-alpha",
+      "state": "done",
+      "startedAt": 1787377747981,
+      "queuedAt": 1787377747890,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "## Verified 2026 state of exchange-rate APIs (all tested li…",
+      "promptPreview": "You are researching exchange-rate APIs for an open-source remittance-cost comparator (global corridors, e.g. US->India, UAE->Philippines). TASK: verify the CURRENT (2026) state of these options and recommend primary + fallback:\n\n1. Frankfurter (https://frankfurter.dev / api.frankfurter.dev): endpoints, auth (key or not), rate limits, license, currency coverage (ECB reference rates — how many curre…",
+      "lastProgressAt": 1787378475758,
+      "tokens": 33978,
+      "toolCalls": 26,
+      "durationMs": 722774,
+      "resultPreview": "{\"summary\":\"## Verified 2026 state of exchange-rate APIs (all tested live on 2026-08-22)\\n\\n### Recommendation\\n- **PRIMARY: fawazahmed0/exchange-api** (successor of fawazahmed0/currency-api). Static JSON over CDN, **no key, no rate limits**, **341 currencies** (all corridors covered: INR, PHP, NGN, PKR, BDT, ETB, VND, KES, GHS, LKR, NPR, MMK, UZS...), **daily updates**, **data licensed CC0-1.0** …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "prior-art",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a3441db12c4b846aa",
+      "model": "stealth/ox-alpha",
+      "state": "done",
+      "startedAt": 1787377747982,
+      "queuedAt": 1787377747890,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "## Prior-art sweep: open-source remittance-cost comparator …",
+      "promptPreview": "Prior-art sweep for an open-source remittance-cost comparator (planned: open data from World Bank Remittance Prices Worldwide, ranks providers by TRUE cost = fee + hidden FX margin, public API, zero affiliate bias).\n\nTASK:\n1. Search GitHub for existing open-source remittance comparison projects (queries like: remittance comparison, remittance price comparator, send money comparison, world bank rem…",
+      "lastProgressAt": 1787378851658,
+      "tokens": 37654,
+      "toolCalls": 32,
+      "durationMs": 1098665,
+      "resultPreview": "{\"summary\":\"## Prior-art sweep: open-source remittance-cost comparator\\n\\n### 1. GitHub open-source landscape — no notable project exists\\nVerified via GitHub REST API (`gh` CLI + api.github.com) across queries: \\\"remittance comparison\\\", \\\"remittance price\\\", \\\"send money comparison\\\", \\\"money transfer comparison\\\", \\\"world bank remittance\\\", \\\"exchange rate margin\\\", topic:remittance, topic:mone…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "market-stats",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a604c1c35afeb4ede",
+      "model": "stealth/ox-alpha",
+      "state": "done",
+      "startedAt": 1787377747982,
+      "queuedAt": 1787377747891,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "## Verified market statistics (as of 2026-08-22) **1. Globa…",
+      "promptPreview": "Verify market statistics for the landing page and framing doc of an open-source remittance-cost transparency project. For EACH stat, find the most recent authoritative figure + source URL + as-of date (prefer World Bank/KNOMAD Migration and Development Briefs, RPW quarterly reports, UN SDG documentation):\n\n1. Global remittance flows to low- and middle-income countries (latest full-year figure + mo…",
+      "lastProgressAt": 1787379567835,
+      "tokens": 54197,
+      "toolCalls": 42,
+      "durationMs": 1814840,
+      "resultPreview": "{\"summary\":\"## Verified market statistics (as of 2026-08-22)\\n\\n**1. Global remittance flows to LMICs**\\n- Latest full-year estimate: **$685 billion expected for 2024 (+5.8% y/y, vs +1.2% in 2023)**; world total incl. high-income countries **$905 billion (2024e)** vs $865B in 2023. Source: World Bank People Move blog by Ratha/Plaza/Kim, **Dec 18, 2024** (verified directly): https://blogs.worldbank…"
+    }
+  ],
+  "totalTokens": 163816,
+  "totalToolCalls": 129
+}
