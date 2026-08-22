@@ -1,0 +1,129 @@
+# Monthly RPW release probe (ADR-0002/0005).
+#
+# Resolves the newest Remittance Prices Worldwide workbook from the World Bank
+# catalog, ingests it into an ephemeral Postgres service container, runs the
+# acceptance checks, and opens a `data-release` issue when — and only when — a
+# release with this exact sha256 has never been announced before.
+#
+# Notes:
+# * schedule fires only on the default branch; GitHub auto-disables cron after
+#   60 days of repo inactivity.
+# * the pipeline itself decides data quality: identity violations are recorded
+#   up to the documented ~0.02% baseline; anything above the 1% guardrail exits
+#   non-zero and turns this run red (rw-ingest ingest, EXIT_MATH_DRIFT).
+# * no workbook is stored here — only its hash, counts, and verification output.
+
+name: ingest-check
+
+on:
+  schedule:
+    - cron: "23 9 17 * *" # monthly probe; releases lag surveys ~2 quarters
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ingest-check
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: rw
+          POSTGRES_PASSWORD: rw
+          POSTGRES_DB: rw
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rw"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://rw:rw@localhost:5432/rw
+      UV_CACHE_DIR: /tmp/.uv-cache
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install
+        working-directory: pipeline
+        run: uv sync --locked
+
+      - name: Resolve + download latest release
+        id: fetch
+        working-directory: pipeline
+        run: |
+          uv run rw-ingest fetch --out var/rpw.xlsx | tee /tmp/fetch.log
+          sha=$(awk '/^sha256:/ {print $2}' /tmp/fetch.log)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Ingest
+        working-directory: pipeline
+        run: uv run rw-ingest ingest --file var/rpw.xlsx | tee /tmp/stats.log
+
+      - name: Verify acceptance checks
+        working-directory: pipeline
+        run: uv run rw-ingest verify | tee /tmp/verify.log
+
+      - name: Announce new release
+        if: steps.fetch.outputs.sha != ''
+        working-directory: pipeline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha="${{ steps.fetch.outputs.sha }}"
+          short="${sha:0:12}"
+          gh label create data-release \
+            --description "A new RPW quarterly release was ingested" \
+            --color 0E8A16 2>/dev/null || true
+
+          # One announcement per release ever — search open AND closed issues.
+          seen=$(gh issue list --state all --search "RPW release ${short} in:title" --json number --jq length)
+          if [ "$seen" != "0" ]; then
+            echo "release ${short} already announced (${seen} issue(s)); skipping"
+            exit 0
+          fi
+
+          {
+            echo "Release file digest \`${sha}\` was never announced before."
+            echo ""
+            echo "<details><summary>fetch</summary>"
+            echo ""
+            echo '```'
+            cat /tmp/fetch.log
+            echo '```'
+            echo "</details>"
+            echo ""
+            echo "<details><summary>ingest stats</summary>"
+            echo ""
+            echo '```'
+            cat /tmp/stats.log
+            echo '```'
+            echo "</details>"
+            echo ""
+            echo "<details><summary>verify</summary>"
+            echo ""
+            echo '```'
+            cat /tmp/verify.log
+            echo '```'
+            echo "</details>"
+            echo ""
+            echo "Next: regenerate the serving JSON artifacts from this release"
+            echo "(M2 pipeline-to-artifacts flow, ADR-0005). Provenance:"
+            echo "docs/data-provenance.md"
+          } > /tmp/body.md
+
+          gh issue create \
+            --title "RPW release ${short} ready" \
+            --label data-release \
+            --body-file /tmp/body.md
