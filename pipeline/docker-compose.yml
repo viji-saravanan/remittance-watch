@@ -1,0 +1,17 @@
+# Local transform database (ADR-0005: Postgres is an ephemeral pipeline workspace,
+# never a hosted dependency). Start with `docker compose -f pipeline/docker-compose.yml up -d`.
+#
+# Data lives in ./.dbdata (gitignored) rather than tmpfs: a full RPW release needs
+# >2 GB, which exceeds Docker Desktop's default tmpfs. Still disposable —
+# `docker compose down` + `rm -rf pipeline/.dbdata` resets it completely.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rw
+      POSTGRES_PASSWORD: rw
+      POSTGRES_DB: rw
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./.dbdata:/var/lib/postgresql/data
