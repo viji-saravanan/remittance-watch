@@ -62,6 +62,7 @@ jobs:
       - name: Resolve + download latest release
         id: fetch
         working-directory: pipeline
+        shell: bash # explicit bash = -eo pipefail; default -e would mask a fetch failure behind tee
         run: |
           uv run rw-ingest fetch --out var/rpw.xlsx | tee /tmp/fetch.log
           sha=$(awk '/^sha256:/ {print $2}' /tmp/fetch.log)
@@ -69,10 +70,12 @@ jobs:
 
       - name: Ingest
         working-directory: pipeline
+        shell: bash # pipefail: the 1% violation guardrail must turn the run red
         run: uv run rw-ingest ingest --file var/rpw.xlsx | tee /tmp/stats.log
 
       - name: Verify acceptance checks
         working-directory: pipeline
+        shell: bash
         run: uv run rw-ingest verify | tee /tmp/verify.log
 
       - name: Announce new release
