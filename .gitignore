@@ -25,6 +25,7 @@ Thumbs.db
 # data snapshots are committed deliberately under fixtures/ — nothing else raw
 /data/
 /var/
+/pipeline/var/
 /pipeline/.dbdata/
 *.xlsx
 !tests/fixtures/*.xlsx
