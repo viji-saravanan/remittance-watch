@@ -15,7 +15,9 @@ body {
 .progress-hairline {
   position: fixed;
   inset: 0 0 auto 0;
-  height: 3px;
+  /* border-box: the inset padding must be ADDED to the height, or the bar's
+     content box collapses to 0 on notched phones and nothing renders */
+  height: calc(env(safe-area-inset-top) + 3px);
   padding-top: env(safe-area-inset-top);
   z-index: 80;
   pointer-events: none;
@@ -76,6 +78,14 @@ body {
   .story-nav {
     right: calc(env(safe-area-inset-right) + 14px);
     gap: var(--s-2);
+  }
+}
+
+/* Desktop affordance only: on phones the 44px hit areas would sit invisibly
+   over the right edge of body text and steal its taps. */
+@media (max-width: 767px) {
+  .story-nav {
+    display: none;
   }
 }
 
@@ -191,9 +201,12 @@ body {
 
 /* ── 2 · the gap ──────────────────────────────────────────────────────── */
 
-.gap-headline {
+/* Specificity (0,2,1): must out-rank landing.css `.section h2` (0,1,1), which
+   would otherwise shrink the section's centerpiece figure to --fs-5. */
+.section h2.gap-headline {
   font-size: clamp(4rem, 13vw, 7.75rem);
   line-height: 1;
+  max-width: none;
   margin: 0 0 var(--s-4);
   color: var(--ink);
 }
@@ -272,7 +285,7 @@ body {
   white-space: nowrap;
   font-size: var(--fs-0);
   font-weight: 600;
-  color: var(--ink-faint);
+  color: var(--ink-muted);
   padding-bottom: var(--s-1);
 }
 
@@ -280,7 +293,7 @@ body {
   display: flex;
   justify-content: space-between;
   font-size: var(--fs-0);
-  color: var(--ink-faint);
+  color: var(--ink-muted);
   margin-top: var(--s-2);
 }
 
@@ -354,7 +367,7 @@ body {
   font-size: var(--fs-0);
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--ink-muted);
 }
 
 .anatomy-legend {
@@ -396,7 +409,7 @@ body {
 
 .anatomy-caption {
   font-size: var(--fs-1);
-  color: var(--ink-faint);
+  color: var(--ink-muted);
   margin-top: var(--s-6);
   max-width: 62ch;
 }
@@ -416,7 +429,7 @@ body {
 
 .cmp-sub {
   font-size: var(--fs-0);
-  color: var(--ink-faint);
+  color: var(--ink-muted);
   margin-bottom: var(--s-6);
 }
 
@@ -459,7 +472,7 @@ body {
 
 .cmp-note {
   font-size: var(--fs-0);
-  color: var(--ink-faint);
+  color: var(--ink-muted);
   margin-top: var(--s-4);
   border-top: 1px solid var(--line);
   padding-top: var(--s-4);
@@ -476,6 +489,12 @@ body {
   max-width: 920px;
   margin: var(--s-16) auto;
   padding: 0 var(--s-6);
+}
+
+/* Slots are the flex children; the .chip inside is what the convergence
+   tween flies (data-lag lives on the slot — never both on one element). */
+.chip-cloud > li {
+  display: flex;
 }
 
 .chip {
@@ -500,7 +519,7 @@ body {
 
 /* fewer chips on phones — the convergence stays readable */
 @media (max-width: 767px) {
-  .chip:nth-child(n + 9) {
+  .chip-cloud > li:nth-child(n + 9) {
     display: none;
   }
 }
@@ -520,7 +539,7 @@ body {
 
 .search-mock__q {
   flex: 1;
-  color: var(--ink-faint);
+  color: var(--ink-muted);
   font-size: var(--fs-2);
 }
 
@@ -635,7 +654,7 @@ body {
   font-size: var(--fs-0);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--ink-muted);
 }
 
 /* ── 6 · finale ───────────────────────────────────────────────────────── */
@@ -687,7 +706,7 @@ body {
   margin: var(--s-12) 0 0;
   padding: 0;
   font-size: var(--fs-0);
-  color: var(--ink-faint);
+  color: var(--ink-muted);
 }
 
 .finale-meta li {

@@ -93,23 +93,27 @@ export function Hero() {
         });
 
         /* Char-mask reveal on the display line. Wait for fonts so glyph widths
-           are final before splitting; skip entirely if motion got turned off
-           in the interim. */
+           are final before splitting. The callback runs outside the context,
+           so it is gated on a cancelled flag and the tween is killed by hand
+           in cleanup (SplitText.revert alone never touches tweens). */
         let split: SplitText | null = null;
+        let chars: gsap.core.Tween | null = null;
+        let cancelled = false;
         document.fonts.ready.then(() => {
-          if (!window.matchMedia(MQ_REDUCE).matches && title.current) {
-            split = new SplitText(title.current, { type: "chars,words", mask: "chars" });
-            gsap.from(split.chars, {
-              yPercent: 118,
-              duration: 0.9,
-              ease: "power4.out",
-              stagger: { each: 0.02 },
-            });
-          }
+          if (cancelled || window.matchMedia(MQ_REDUCE).matches || !title.current) return;
+          split = new SplitText(title.current, { type: "chars,words", mask: "chars" });
+          chars = gsap.from(split.chars, {
+            yPercent: 118,
+            duration: 0.9,
+            ease: "power4.out",
+            stagger: { each: 0.02 },
+          });
         });
 
         return () => {
+          cancelled = true;
           cue.kill();
+          chars?.kill();
           split?.revert();
           split = null;
         };

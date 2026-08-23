@@ -51,13 +51,16 @@ export function FinaleSection() {
           );
         }
 
-        /* Word cascade once fonts are final; skipped if motion got disabled
-           between setup and font settle. */
+        /* Word cascade once fonts are final. The callback runs outside the
+           context, so it is gated on a cancelled flag and every artifact it
+           creates (tween + its ScrollTrigger) is killed by hand in cleanup. */
         let split: SplitText | null = null;
+        let cascade: gsap.core.Tween | undefined;
+        let cancelled = false;
         document.fonts.ready.then(() => {
-          if (window.matchMedia(MQ_REDUCE).matches || !title.current) return;
+          if (cancelled || window.matchMedia(MQ_REDUCE).matches || !title.current) return;
           split = new SplitText(title.current, { type: "words", mask: "words" });
-          gsap.from(split.words, {
+          cascade = gsap.from(split.words, {
             yPercent: 120,
             duration: 0.85,
             ease: "power4.out",
@@ -67,7 +70,10 @@ export function FinaleSection() {
         });
 
         return () => {
+          cancelled = true;
           hue?.scrollTrigger?.kill();
+          cascade?.scrollTrigger?.kill();
+          cascade?.kill();
           split?.revert();
           split = null;
         };

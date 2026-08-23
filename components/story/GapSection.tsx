@@ -64,7 +64,8 @@ export function GapSection() {
         });
 
         tl.from("[data-reveal]", { opacity: 0, y: 26, stagger: 0.08, duration: 0.45 })
-          .from(".gap-fill", { width: 0, duration: desktop ? 1 : 0.9, ease: "none" }, 0)
+          // scaleX not width: transforms only inside a scrubbed pin
+          .from(".gap-fill", { scaleX: 0, transformOrigin: "left center", duration: desktop ? 1 : 0.9, ease: "none" }, 0)
           .to(counter, { v: ACTUAL, duration: desktop ? 1 : 0.9, ease: "none", onUpdate: setNum }, 0)
           .from(".gap-target", { autoAlpha: 0, x: -18, duration: 0.3 }, ">")
           .from(".gap-excess", { scaleX: 0, transformOrigin: "left center", duration: 0.35 }, "<")

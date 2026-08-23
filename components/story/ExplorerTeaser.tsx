@@ -106,18 +106,17 @@ export function ExplorerTeaser() {
       </div>
 
       <ul className="chip-cloud" aria-label="Example remittance corridors">
+        {/* data-lag sits on the outer slot and the flight dataset on the inner
+           .chip: ScrollSmoother drives the slot's transform while the
+           convergence tween flies the chip — two writers on one element would
+           fight over y every frame. */}
         {CORRIDORS.map(({ from, to, x, y, r, lag }) => (
-          <li
-            key={`${from}-${to}`}
-            className={`chip${lag ? " chip--lag" : ""}`}
-            data-x={x}
-            data-y={y}
-            data-r={r}
-            data-lag={lag}
-          >
-            {from}
-            <MoveRight size={13} aria-hidden />
-            {to}
+          <li key={`${from}-${to}`} className="chip-slot" data-lag={lag}>
+            <span className="chip" data-x={x} data-y={y} data-r={r}>
+              {from}
+              <MoveRight size={13} aria-hidden />
+              {to}
+            </span>
           </li>
         ))}
       </ul>
