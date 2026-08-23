@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { ClipboardList, CodeXml, Database, Eye, ShieldCheck } from "lucide-react";
+import { ClipboardList, CodeXml, Database, Eye, Route, ShieldCheck } from "lucide-react";
 import {
   gsap,
   SplitText,
@@ -14,11 +14,13 @@ import {
   MQ_MOTION_OK,
   MQ_REDUCE,
 } from "../../lib/motion";
+import { SITE, fmtInt } from "../../lib/site-data";
 
 const REPO = "https://github.com/viji-saravanan/remittance-watch";
 
 /** Section 6 — the ask. Hue-drifting backdrop on desktop scrub, word-cascade
-    headline, and a magnetic primary button for fine pointers only. */
+    headline, magnetic primary button for fine pointers, and the dataset's own
+    receipts in the meta row. */
 export function FinaleSection() {
   const scope = useRef<HTMLElement>(null);
   const title = useRef<HTMLHeadingElement>(null);
@@ -107,9 +109,14 @@ export function FinaleSection() {
     { scope },
   );
 
+  const pipeline = SITE.pipeline;
+
   return (
     <section id="story-start" ref={scope} className="finale">
       <div className="finale-blob" aria-hidden="true" />
+      <span className="finale-ghost" aria-hidden="true">
+        RemitWatch
+      </span>
       <div className="shell finale-inner">
         <h2 ref={title}>Know the true cost before you send.</h2>
         <p className="lede" data-reveal>
@@ -124,23 +131,27 @@ export function FinaleSection() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            <CodeXml size={16} aria-hidden />
+            <CodeXml size="1em" aria-hidden />
             Read the source
           </a>
           <a href={`${REPO}/issues`} className="button ghost pressable" target="_blank" rel="noopener noreferrer">
-            <ClipboardList size={16} aria-hidden />
+            <ClipboardList size="1em" aria-hidden />
             Follow the build log
           </a>
         </div>
         <ul className="finale-meta" data-reveal>
-          <li>
-            <ShieldCheck size={14} aria-hidden /> MIT code
+          <li title="Quotes loaded by our ingestion pipeline">
+            <Database size="1em" aria-hidden /> {fmtInt(pipeline.quotes)} quotes · {pipeline.first_quarter}–
+            {pipeline.last_quarter}
+          </li>
+          <li title="Coverage of the current World Bank release">
+            <Route size="1em" aria-hidden /> {pipeline.corridors} corridors · {pipeline.countries} countries
+          </li>
+          <li title={SITE.meta.source.license}>
+            <ShieldCheck size="1em" aria-hidden /> {SITE.meta.source.license} data · MIT code
           </li>
           <li>
-            <Database size={14} aria-hidden /> CC BY 4.0 data
-          </li>
-          <li>
-            <Eye size={14} aria-hidden /> No cookies, no trackers, no ads
+            <Eye size="1em" aria-hidden /> No cookies, no trackers, no ads
           </li>
         </ul>
       </div>

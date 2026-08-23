@@ -10,8 +10,26 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Viewport-relative sizing, globally: the root font-size rides the viewport
+     above ~1920px (the 0.8333vw point where 16px meets a 1920 screen), so every
+     rem-based token, type size and spacing step scales proportionally on QHD/4K
+     instead of leaving a laptop-proportioned column adrift in a huge canvas.
+     The 16px floor keeps phones, tablets and laptops exactly as designed. */
+  font-size: clamp(16px, 0.8333vw, 30px);
   /* No CSS smooth-scrolling: it fights ScrollToPlugin when JS is live
      (ADR-0006 §6). In-page anchors route through lib/scroller instead. */
+}
+
+/* Material: a faint film-grain over everything so flat surfaces read as paper,
+   not blank canvas. Pure SVG turbulence, one 160px tile, no requests. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 body {

@@ -48,6 +48,15 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("verify", help="run acceptance checks on the loaded data")
 
+    p_export = sub.add_parser(
+        "export-site-data",
+        help="emit the versioned JSON the website renders (real data only, no hardcodes)",
+    )
+    p_export.add_argument(
+        "--out", type=Path, default=Path("app/data/site-data.json"),
+        help="output path relative to the repo root (default: app/data/site-data.json)",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "migrate":
@@ -58,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
         return _ingest(args.file, args.download, args.strict)
     elif args.command == "verify":
         _verify()
+    elif args.command == "export-site-data":
+        _export_site_data(args.out)
     return 0
 
 
@@ -118,6 +129,19 @@ def _record_provenance(resource: catalog.WorkbookResource, digest: str, path: Pa
     log = path.parent / "provenance.log"
     with log.open("a", encoding="utf-8") as fh:
         fh.write(f"{digest}  {resource.resource_id}  {resource.name}  {resource.modified_on}\n")
+
+
+def _export_site_data(out: Path) -> None:
+    from .site_export import export_site_data
+
+    if not out.is_absolute():
+        # the default (and any relative path) is repo-relative, so the command
+        # works the same from pipeline/ as from the repo root
+        out = Path(__file__).resolve().parents[3] / out
+    with db.connect() as conn:
+        written = export_site_data(conn, out)
+    print(f"wrote: {written}")
+    print("the site imports this file at build time — regenerate after every re-ingest")
 
 
 def _verify() -> None:

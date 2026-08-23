@@ -9,12 +9,17 @@
 
 /* header */
 .site-header {
+  border-bottom: 1px solid var(--line);
+}
+
+.header-row {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-4);
-  padding: var(--s-6) 0;
-  border-bottom: 1px solid var(--line);
+  width: 100%;
+  padding-top: var(--s-6);
+  padding-bottom: var(--s-6);
 }
 
 .wordmark {
@@ -28,6 +33,7 @@
 
 .site-nav {
   display: flex;
+  align-items: center;
   gap: var(--s-6);
   font-size: var(--fs-1);
 }
@@ -35,10 +41,27 @@
 .site-nav a {
   color: var(--ink-muted);
   text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .site-nav a:hover {
   color: var(--accent);
+}
+
+/* Phones: keep the header a single clean row — wordmark left, the two repo
+   links right. In-page anchors only pay off once a scroll story is on screen,
+   which is exactly what the desktop dot-nav already covers. Two classes so
+   the rule out-ranks `.site-nav a` (0,2,0 vs 0,1,1). */
+@media (max-width: 767px) {
+  .site-nav .nav-anchor {
+    display: none;
+  }
+  .header-row {
+    padding-top: var(--s-4);
+    padding-bottom: var(--s-4);
+  }
 }
 
 /* shared eyebrow — section kickers with their icon */
@@ -50,7 +73,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--ink-muted);
   margin: 0 0 var(--s-4);
 }
 
@@ -125,7 +148,7 @@
 
 .log li {
   display: grid;
-  grid-template-columns: 64px 1fr auto;
+  grid-template-columns: 4rem 1fr auto;
   gap: var(--s-6);
   align-items: baseline;
   padding: var(--s-4) 0;
@@ -147,7 +170,7 @@
   align-items: center;
   gap: 5px;
   font-size: var(--fs-0);
-  color: var(--ink-faint);
+  color: var(--ink-muted);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -166,7 +189,7 @@
   border-top: 1px solid var(--line);
   padding: var(--s-8) 0 var(--s-16);
   font-size: var(--fs-0);
-  color: var(--ink-faint);
+  color: var(--ink-muted);
 }
 
 .site-footer p + p {
@@ -178,7 +201,7 @@
     gap: var(--s-4);
   }
   .log li {
-    grid-template-columns: 48px 1fr;
+    grid-template-columns: 3rem 1fr;
   }
   .log .state {
     grid-column: 2;

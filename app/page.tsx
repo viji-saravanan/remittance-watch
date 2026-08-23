@@ -27,14 +27,13 @@ export default function Home() {
 
       <SmoothScroll>
         <header className="site-header">
-          <div
-            className="shell"
-            style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", width: "100%", gap: "var(--s-4)" }}
-          >
+          <div className="shell header-row">
             <Link href="/" className="wordmark">RemitWatch</Link>
             <nav className="site-nav" aria-label="Site">
-              <a href="#story-gap">The gap</a>
-              <a href="#story-explorer">Roadmap</a>
+              {/* In-page anchors are desktop affordances — on phones the row
+                  wraps and tears (they hide ≤767px); the repo links stay. */}
+              <a className="nav-anchor" href="#story-gap">The gap</a>
+              <a className="nav-anchor" href="#story-explorer">Roadmap</a>
               <a href={REPO}>Source</a>
               <a href={`${REPO}/issues`}>Build log</a>
             </nav>
