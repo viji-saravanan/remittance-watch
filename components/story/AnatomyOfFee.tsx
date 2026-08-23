@@ -10,21 +10,12 @@ import {
   MQ_DESKTOP,
   MQ_MOTION_OK,
 } from "../../lib/motion";
+import { SITE, fmtInt } from "../../lib/site-data";
 
-const CITE_RPW =
-  "https://remittanceprices.worldbank.org/sites/default/files/2026-04/RPW_main_report_and_annex_Q325.pdf";
-
-/* Real workbook row (Issue 54, Q3 2025): 33,000 AOA cash transfer, Angola → Namibia.
-   Widths are % of the whole transfer; digital-vs-cash bars scale to 7.30% max. */
-const SEGMENTS = [
-  { key: "arrives", width: "90.06%", label: "arrives — 90.06%" },
-  { key: "fee", width: "6.84%", label: "visible fee — 6.84%" },
-  { key: "margin", width: "3.10%", label: "hidden FX margin — 3.10%" },
-] as const;
-
-/** Section 3 — decompose one real transfer, then show the digital/cash gap.
-    Desktop pins the stage and scrubs the dissection; mobile plays the same
-    beats on entry without pinning; reduced motion shows finals immediately. */
+/** Section 3 — decompose one real transfer (the costliest honest quote this
+    quarter, picked by the exporter), then show the digital/cash gap we compute
+    ourselves. Desktop pins the stage and scrubs the dissection over a
+    viewport-relative runway; mobile plays the same beats on entry. */
 export function AnatomyOfFee() {
   const scope = useRef<HTMLElement>(null);
 
@@ -46,10 +37,11 @@ export function AnatomyOfFee() {
             ? {
                 trigger: section,
                 start: "top top",
-                end: "+=1100",
+                end: () => `+=${Math.round(window.innerHeight * 1.25)}`,
                 scrub: 0.6,
                 pin: true,
                 anticipatePin: 1,
+                invalidateOnRefresh: true,
               }
             : {
                 trigger: section,
@@ -59,7 +51,7 @@ export function AnatomyOfFee() {
         });
 
         tl.from("[data-reveal]", { opacity: 0, y: 26, stagger: 0.08, duration: 0.4 })
-          // the three slices measure themselves out of the $200
+          // the three slices measure themselves out of the transfer
           .from(
             ".seg",
             { scaleX: 0, transformOrigin: "left center", stagger: 0.18, duration: 0.5, ease: "power2.out" },
@@ -88,11 +80,15 @@ export function AnatomyOfFee() {
     { scope },
   );
 
+  const a = SITE.anatomy;
+  const computed = SITE.computed;
+  const cited = SITE.cited;
+
   return (
     <section id="story-anatomy" ref={scope} className="section anatomy">
       <div className="shell">
         <p className="eyebrow" data-reveal>
-          <Microscope size={15} aria-hidden /> Anatomy of a fee
+          <Microscope size="1em" aria-hidden /> Anatomy of a fee
         </p>
         <h2 data-reveal>The sticker fee is not the cost.</h2>
         <p className="prose" data-reveal>
@@ -103,60 +99,92 @@ export function AnatomyOfFee() {
         </p>
 
         <div className="anatomy-stage">
-          <figure className="anatomy-fig">
-            <div
-              className="anatomy-bar"
-              role="img"
-              aria-label="Of a 33,000 kwanza transfer, 90.06 percent arrives, 6.84 percent is the visible fee, and 3.10 percent is the hidden exchange-rate margin"
-            >
-              {SEGMENTS.map((segment) => (
-                <div key={segment.key} className={`seg seg--${segment.key}`} style={{ width: segment.width }} />
-              ))}
-            </div>
-            <div className="anatomy-baseline" aria-hidden="true">
-              <span>mid-market truth line</span>
-            </div>
-            <ul className="anatomy-legend tnum" data-reveal>
-              {SEGMENTS.map((segment) => (
-                <li key={segment.key}>
-                  <span className={`swatch swatch--${segment.key}`} aria-hidden />
-                  {segment.label}
+          {a && (
+            <figure className="anatomy-fig">
+              <div
+                className="anatomy-bar"
+                role="img"
+                aria-label={`Of a ${fmtInt(a.lcu_amount)} ${a.currency} transfer from ${a.from_name} to ${a.to_name}, ${a.arrives_pct} percent arrives, ${a.fee_pct} percent is the visible fee, and ${a.margin_pct} percent is the hidden exchange-rate margin`}
+              >
+                <div className="seg seg--arrives" style={{ width: `${a.arrives_pct}%` }} />
+                <div className="seg seg--fee" style={{ width: `${a.fee_pct}%` }} />
+                <div className="seg seg--margin" style={{ width: `${a.margin_pct}%` }} />
+              </div>
+              <div className="anatomy-baseline" aria-hidden="true">
+                <span>mid-market truth line</span>
+              </div>
+
+              <p className="perdollar tnum" data-reveal>
+                <span className="pd pd--arrives">
+                  <b>{a.arrives_pct.toFixed(2)}¢</b> of every $1 arrives
+                </span>
+                <span className="pd pd--fee">
+                  <b>{a.fee_pct.toFixed(2)}¢</b> is the printed fee
+                </span>
+                <span className="pd pd--margin">
+                  <b>{a.margin_pct.toFixed(2)}¢</b> hides in the rate
+                </span>
+              </p>
+
+              <ul className="anatomy-legend tnum" data-reveal>
+                <li>
+                  <span className="swatch swatch--arrives" aria-hidden /> arrives — {a.arrives_pct}%
                 </li>
-              ))}
-            </ul>
-            <figcaption className="anatomy-caption tnum">
-              One real row from the source workbook: a 33,000&nbsp;AOA cash transfer, Angola&nbsp;→
-              Namibia, Q3&nbsp;2025. The fee is printed on the receipt. The margin appears nowhere a
-              customer can see it.{" "}
-              <a href={CITE_RPW} target="_blank" rel="noopener noreferrer">
-                World Bank RPW, Issue 54
-              </a>
-              .
-            </figcaption>
-          </figure>
+                <li>
+                  <span className="swatch swatch--fee" aria-hidden /> visible fee — {a.fee_pct}%
+                </li>
+                <li>
+                  <span className="swatch swatch--margin" aria-hidden /> hidden FX margin — {a.margin_pct}%
+                </li>
+              </ul>
+              <figcaption className="anatomy-caption tnum">
+                The costliest honest quote in this quarter&rsquo;s data: {a.provider}, {a.instrument.toLowerCase()},
+                {" "}
+                {a.from_name} → {a.to_name}, {fmtInt(a.lcu_amount)} {a.currency} (${a.amount_usd}),{" "}
+                {a.quarter}. The fee is printed on the receipt. The margin appears nowhere a
+                customer can see it.
+              </figcaption>
+            </figure>
+          )}
 
           {/* No data-reveal: the timeline slides it in last — a batch reveal
               would double-animate it against the sequenced entrance. */}
           <aside className="compare-card">
             <h3>Digital vs cash</h3>
-            <p className="cmp-sub">Same $200, same corridors, same quarter.</p>
+            <p className="cmp-sub">
+              Same ${computed.amount_usd}, same quarter — computed from our own dataset,{" "}
+              {fmtInt(computed.transparent_quotes)} quotes.
+            </p>
             <div className="cmp-row">
-              <Smartphone size={15} aria-hidden />
+              <Smartphone size="1em" aria-hidden />
               <span className="cmp-name">Digital</span>
               <span className="cmp-track">
-                <span className="cmp-fill" style={{ width: "62.9%" }} />
+                <span
+                  className="cmp-fill"
+                  style={{
+                    width:
+                      computed.cash_avg_pct && computed.digital_avg_pct
+                        ? `${(computed.digital_avg_pct / computed.cash_avg_pct) * 100}%`
+                        : undefined,
+                  }}
+                />
               </span>
-              <b className="tnum">4.59%</b>
+              <b className="tnum">{computed.digital_avg_pct?.toFixed(2) ?? "—"}%</b>
             </div>
             <div className="cmp-row">
-              <Banknote size={15} aria-hidden />
+              <Banknote size="1em" aria-hidden />
               <span className="cmp-name">Cash</span>
               <span className="cmp-track">
                 <span className="cmp-fill" style={{ width: "100%" }} />
               </span>
-              <b className="tnum">7.30%</b>
+              <b className="tnum">{computed.cash_avg_pct?.toFixed(2) ?? "—"}%</b>
             </div>
-            <p className="cmp-note">The people paying 7% can least afford it.</p>
+            <p className="cmp-note">
+              The people paying cash — {computed.cash_avg_pct ? computed.cash_avg_pct.toFixed(2) : "—"}% vs{" "}
+              {computed.digital_avg_pct ? computed.digital_avg_pct.toFixed(2) : "—"}% — can least
+              afford it. The World Bank&rsquo;s own split for the quarter: {cited.digital_avg_pct}% /{" "}
+              {cited.cash_avg_pct}%.
+            </p>
           </aside>
         </div>
       </div>

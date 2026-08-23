@@ -91,10 +91,11 @@ export function EthicsSeal() {
           scrollTrigger: {
             trigger: section,
             start: "top top",
-            end: "+=750",
+            end: () => `+=${Math.round(window.innerHeight * 0.9)}`,
             scrub: 0.6,
             pin: true,
             anticipatePin: 1,
+            invalidateOnRefresh: true,
           },
         });
 
@@ -117,14 +118,14 @@ export function EthicsSeal() {
       <div className="shell ethics-grid">
         <div className="charter-copy">
           <p className="eyebrow">
-            <Scale size={15} aria-hidden /> The charter
+            <Scale size="1em" aria-hidden /> The charter
           </p>
           <h2>Rules we don&rsquo;t bend.</h2>
           <ul className="charter-list">
             {PRINCIPLES.map((principle) => (
               <li key={principle.name}>
                 <span className="charter-icon" aria-hidden>
-                  <principle.icon size={17} />
+                  <principle.icon size="1em" />
                 </span>
                 <span className="charter-body">
                   <span className="name">{principle.name}</span>

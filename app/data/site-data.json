@@ -1,0 +1,348 @@
+{
+  "meta": {
+    "generated_utc": "2026-08-23T16:23:04Z",
+    "generator": "rw-ingest export-site-data",
+    "source": {
+      "workbook": "World Bank Remittance Prices Worldwide, Issue 54 (Q3 2025)",
+      "license": "CC BY 4.0",
+      "url": "https://remittanceprices.worldbank.org"
+    }
+  },
+  "pipeline": {
+    "quotes": 408938,
+    "quarters": 37,
+    "first_quarter": "2016_2Q",
+    "last_quarter": "2025_3Q",
+    "corridors": 368,
+    "providers": 706,
+    "countries": 134
+  },
+  "cited": {
+    "global_avg_cost_pct": 6.36,
+    "global_avg_label": "Global average cost of sending $200 — RPW Issue 54, Q3 2025",
+    "global_avg_url": "https://remittanceprices.worldbank.org/sites/default/files/2026-04/RPW_main_report_and_annex_Q325.pdf",
+    "sdg_target_pct": 3.0,
+    "sdg_label": "UN SDG target 10.c — less than 3% by 2030",
+    "sdg_url": "https://sdgs.un.org/goals/goal10",
+    "digital_avg_pct": 4.59,
+    "cash_avg_pct": 7.3,
+    "avg_split_label": "Digital vs cash average cost of sending $200 — RPW Issue 54, Q3 2025",
+    "avg_split_url": "https://remittanceprices.worldbank.org/sites/default/files/2026-04/RPW_main_report_and_annex_Q325.pdf",
+    "flows_usd_bn": 685,
+    "flows_year": 2024,
+    "flows_label": "Sent to low- and middle-income countries in 2024 — World Bank / KNOMAD",
+    "flows_url": "https://www.knomad.org/publication/migration-and-development-brief-40"
+  },
+  "computed": {
+    "quarter": "2025_3Q",
+    "amount_usd": 200,
+    "quotes_total": 6470,
+    "transparent_quotes": 6470,
+    "non_transparent_quotes": 0,
+    "avg_total_cost_pct": 6.36,
+    "median_total_cost_pct": 4.12,
+    "p90_total_cost_pct": 12.34,
+    "digital_avg_pct": 4.72,
+    "cash_avg_pct": 9.92,
+    "digital_quotes": 4425,
+    "cash_quotes": 2045,
+    "cost_bands": [
+      {
+        "up_to_pct": 3,
+        "quotes": 2081
+      },
+      {
+        "up_to_pct": 6,
+        "quotes": 2475
+      },
+      {
+        "up_to_pct": 9,
+        "quotes": 955
+      },
+      {
+        "up_to_pct": 12,
+        "quotes": 286
+      },
+      {
+        "up_to_pct": 15,
+        "quotes": 143
+      },
+      {
+        "up_to_pct": null,
+        "quotes": 530
+      }
+    ]
+  },
+  "anatomy": {
+    "from_iso3": "TZA",
+    "to_iso3": "RWA",
+    "from_name": "Tanzania",
+    "to_name": "Rwanda",
+    "provider": "Exim Bank",
+    "instrument": "Bank account transfer",
+    "currency": "TZS",
+    "amount_usd": 200,
+    "lcu_amount": 324500.0,
+    "total_cost_pct": 93.22,
+    "fee_pct": 71.28,
+    "margin_pct": 21.94,
+    "arrives_pct": 6.78,
+    "quarter": "2025_3Q"
+  },
+  "top_corridors": [
+    {
+      "from_iso3": "USA",
+      "to_iso3": "PHL",
+      "from_name": "United States",
+      "to_name": "Philippines",
+      "quotes": 58,
+      "avg_cost_pct": 4.52,
+      "from_ll": [
+        -98.6,
+        39.8
+      ],
+      "to_ll": [
+        122.9,
+        11.8
+      ]
+    },
+    {
+      "from_iso3": "DEU",
+      "to_iso3": "ROU",
+      "from_name": "Germany",
+      "to_name": "Romania",
+      "quotes": 51,
+      "avg_cost_pct": 3.2,
+      "from_ll": [
+        10.4,
+        51.2
+      ],
+      "to_ll": [
+        25.0,
+        45.9
+      ]
+    },
+    {
+      "from_iso3": "USA",
+      "to_iso3": "IND",
+      "from_name": "United States",
+      "to_name": "India",
+      "quotes": 46,
+      "avg_cost_pct": 3.68,
+      "from_ll": [
+        -98.6,
+        39.8
+      ],
+      "to_ll": [
+        78.9,
+        22.9
+      ]
+    },
+    {
+      "from_iso3": "USA",
+      "to_iso3": "MEX",
+      "from_name": "United States",
+      "to_name": "Mexico",
+      "quotes": 46,
+      "avg_cost_pct": 4.54,
+      "from_ll": [
+        -98.6,
+        39.8
+      ],
+      "to_ll": [
+        -102.5,
+        23.6
+      ]
+    },
+    {
+      "from_iso3": "USA",
+      "to_iso3": "SLV",
+      "from_name": "United States",
+      "to_name": "El Salvador",
+      "quotes": 46,
+      "avg_cost_pct": 3.5,
+      "from_ll": [
+        -98.6,
+        39.8
+      ],
+      "to_ll": [
+        -88.9,
+        13.7
+      ]
+    },
+    {
+      "from_iso3": "JPN",
+      "to_iso3": "PHL",
+      "from_name": "Japan",
+      "to_name": "Philippines",
+      "quotes": 45,
+      "avg_cost_pct": 12.88,
+      "from_ll": [
+        138.5,
+        36.6
+      ],
+      "to_ll": [
+        122.9,
+        11.8
+      ]
+    },
+    {
+      "from_iso3": "NOR",
+      "to_iso3": "PAK",
+      "from_name": "Norway",
+      "to_name": "Pakistan",
+      "quotes": 41,
+      "avg_cost_pct": 3.12,
+      "from_ll": [
+        9.6,
+        61.0
+      ],
+      "to_ll": [
+        69.4,
+        30.0
+      ]
+    },
+    {
+      "from_iso3": "USA",
+      "to_iso3": "KEN",
+      "from_name": "United States",
+      "to_name": "Kenya",
+      "quotes": 40,
+      "avg_cost_pct": 4.26,
+      "from_ll": [
+        -98.6,
+        39.8
+      ],
+      "to_ll": [
+        37.9,
+        -0.0
+      ]
+    },
+    {
+      "from_iso3": "ZAF",
+      "to_iso3": "ZWE",
+      "from_name": "South Africa",
+      "to_name": "Zimbabwe",
+      "quotes": 40,
+      "avg_cost_pct": 12.49,
+      "from_ll": [
+        24.7,
+        -29.0
+      ],
+      "to_ll": [
+        29.8,
+        -19.0
+      ]
+    },
+    {
+      "from_iso3": "FRA",
+      "to_iso3": "MAR",
+      "from_name": "France",
+      "to_name": "Morocco",
+      "quotes": 39,
+      "avg_cost_pct": 7.39,
+      "from_ll": [
+        2.5,
+        46.6
+      ],
+      "to_ll": [
+        -6.3,
+        31.9
+      ]
+    },
+    {
+      "from_iso3": "USA",
+      "to_iso3": "COL",
+      "from_name": "United States",
+      "to_name": "Colombia",
+      "quotes": 39,
+      "avg_cost_pct": 4.96,
+      "from_ll": [
+        -98.6,
+        39.8
+      ],
+      "to_ll": [
+        -74.3,
+        4.1
+      ]
+    },
+    {
+      "from_iso3": "GBR",
+      "to_iso3": "PHL",
+      "from_name": "United Kingdom",
+      "to_name": "Philippines",
+      "quotes": 38,
+      "avg_cost_pct": 3.33,
+      "from_ll": [
+        -2.0,
+        54.0
+      ],
+      "to_ll": [
+        122.9,
+        11.8
+      ]
+    },
+    {
+      "from_iso3": "SGP",
+      "to_iso3": "PHL",
+      "from_name": "Singapore",
+      "to_name": "Philippines",
+      "quotes": 38,
+      "avg_cost_pct": 3.16
+    },
+    {
+      "from_iso3": "AUT",
+      "to_iso3": "TUR",
+      "from_name": "Austria",
+      "to_name": "Turkey",
+      "quotes": 37,
+      "avg_cost_pct": 3.94,
+      "from_ll": [
+        14.1,
+        47.6
+      ],
+      "to_ll": [
+        35.2,
+        39.0
+      ]
+    }
+  ],
+  "roadmap": [
+    {
+      "id": "M0",
+      "desc": "Skeleton, design system, CI, deploy",
+      "state": "shipped",
+      "href": "https://github.com/viji-saravanan/remittance-watch/issues/2"
+    },
+    {
+      "id": "M1",
+      "desc": "World Bank workbook → tested Postgres dataset",
+      "state": "shipped",
+      "href": "https://github.com/viji-saravanan/remittance-watch/issues/3"
+    },
+    {
+      "id": "M2",
+      "desc": "Corridor search & true-cost ranking UI",
+      "state": "in progress",
+      "href": "https://github.com/viji-saravanan/remittance-watch/issues/4"
+    },
+    {
+      "id": "M3",
+      "desc": "Public API for researchers & journalists",
+      "state": "queued",
+      "href": "https://github.com/viji-saravanan/remittance-watch/issues/5"
+    },
+    {
+      "id": "M4",
+      "desc": "Live FX overlay, price-drop alerts, Hindi",
+      "state": "queued",
+      "href": "https://github.com/viji-saravanan/remittance-watch/issues/6"
+    },
+    {
+      "id": "M5",
+      "desc": "Methodology, accessibility, launch",
+      "state": "queued",
+      "href": "https://github.com/viji-saravanan/remittance-watch/issues/7"
+    }
+  ]
+}
