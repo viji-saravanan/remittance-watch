@@ -1,0 +1,9 @@
+# Keep the build context lean — the image needs only pyproject.toml, uv.lock, src/.
+.venv/
+.pytest_cache/
+.ruff_cache/
+var/
+.dbdata/
+tests/
+__pycache__/
+*.pyc
