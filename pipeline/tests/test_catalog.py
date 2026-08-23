@@ -93,3 +93,11 @@ def test_suggested_filename_from_url():
         name="n", modified_on=None,
     )
     assert r.suggested_filename == "rpw_dataset_2011_2025_q3.xlsx"
+
+
+def test_download_refuses_non_https(tmp_path):
+    # A compromised/redirected catalog entry must not point the fetch off-scheme;
+    # this refuses before any network I/O.
+    r = WorkbookResource(resource_id="DRX", url="http://example.com/x.xlsx", name="n", modified_on=None)
+    with pytest.raises(CatalogError, match="non-https"):
+        catalog.download(r, tmp_path / "x.xlsx")

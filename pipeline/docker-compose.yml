@@ -12,6 +12,6 @@ services:
       POSTGRES_PASSWORD: rw
       POSTGRES_DB: rw
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432" # loopback only — dev credentials, never LAN-reachable
     volumes:
       - ./.dbdata:/var/lib/postgresql/data

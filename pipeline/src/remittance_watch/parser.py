@@ -261,6 +261,8 @@ def _check_math(row: SourceRow, audit: MathAudit | None) -> None:
             continue
         if None in (tier.lcu_amount, tier.fee_lcu, tier.fx_margin_pct, tier.total_cost_pct):
             continue  # partial blocks exist upstream; loader stores what's there
+        if tier.lcu_amount == 0:
+            continue  # identity is undefined on a zero base — store verbatim, don't divide
         if audit is not None:
             audit.checked += 1
         fee_pct = tier.fee_lcu / tier.lcu_amount * 100

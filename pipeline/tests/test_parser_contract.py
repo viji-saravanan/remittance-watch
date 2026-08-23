@@ -162,3 +162,21 @@ class TestMathAuditMode:
         list(parse_workbook(fixture_path, audit=audit))
         assert audit.violation_count == 0
         assert audit.checked > 0
+
+    def test_zero_lcu_amount_never_divides(self, fixture_path, tmp_path):
+        """A degenerate upstream cell (lcu amount = 0) must not crash the
+        ingest with a bare DivisionByZero — the row is stored verbatim."""
+        from remittance_watch.parser import MathAudit
+
+        col = list(EXPECTED_COLUMNS).index("cc1 lcu amount")
+
+        def corrupt(data):
+            data[1] = tuple(data[1][:col]) + (0,) + tuple(data[1][col + 1:])
+            return data
+
+        path = _mutated_copy(fixture_path, tmp_path, mutate_cell=corrupt)
+        audit = MathAudit()
+        rows = list(parse_workbook(path, audit=audit))  # must not raise
+        assert len(rows) == 4
+        assert rows[0].cc1.lcu_amount == 0
+        assert audit.violation_count == 0
