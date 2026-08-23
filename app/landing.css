@@ -1,4 +1,5 @@
-/* Landing page — editorial, hairline-ruled, no card grids. */
+/* Shared scaffolding for the landing story — chrome, buttons, section rhythm,
+   build log, footer. Section-specific styles live in story.css. */
 
 .shell {
   max-width: var(--wide);
@@ -40,29 +41,24 @@
   color: var(--accent);
 }
 
-/* hero */
-.hero {
-  padding: var(--s-24) 0 var(--s-16);
-}
-
-.hero h1 {
-  font-size: var(--fs-7);
-  max-width: 16ch;
-  margin-bottom: var(--s-6);
-}
-
-.hero .lede {
-  font-size: var(--fs-3);
-  color: var(--ink-muted);
-  max-width: 52ch;
-  margin-bottom: var(--s-8);
-}
-
-.hero .lede strong {
-  color: var(--ink);
+/* shared eyebrow — section kickers with their icon */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-0);
   font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 var(--s-4);
 }
 
+.eyebrow svg {
+  color: var(--accent);
+}
+
+/* buttons */
 .cta-row {
   display: flex;
   gap: var(--s-4);
@@ -71,13 +67,17 @@
 }
 
 .button {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
   padding: var(--s-3) var(--s-6);
   border-radius: var(--radius);
   font-size: var(--fs-1);
   font-weight: 600;
   text-decoration: none;
   border: 1px solid transparent;
+  /* ≥44px tap targets (ADR-0006 §5) */
+  min-height: 44px;
 }
 
 .button.primary {
@@ -90,61 +90,6 @@
   border-color: var(--line-strong);
 }
 
-/* stat strip */
-.stat-strip {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--s-8);
-  padding: var(--s-8) 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  margin-bottom: var(--s-24);
-}
-
-.stat {
-  opacity: 0;
-  transform: translateY(8px);
-  animation: rise var(--dur-ui) var(--ease-out) forwards;
-}
-
-.stat:nth-child(2) { animation-delay: 60ms; }
-.stat:nth-child(3) { animation-delay: 120ms; }
-
-@keyframes rise {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.stat .value {
-  font-family: var(--font-display), Georgia, serif;
-  font-size: var(--fs-5);
-  font-weight: 600;
-  color: var(--ink);
-  line-height: 1.2;
-}
-
-.stat .value em {
-  font-style: normal;
-  color: var(--accent);
-}
-
-.stat .label {
-  font-size: var(--fs-1);
-  color: var(--ink-muted);
-  margin-top: var(--s-2);
-  max-width: 30ch;
-}
-
-.stat cite {
-  display: block;
-  font-size: var(--fs-0);
-  font-style: normal;
-  color: var(--ink-faint);
-  margin-top: var(--s-2);
-}
-
 /* section scaffolding */
 .section {
   padding: var(--s-16) 0;
@@ -154,6 +99,7 @@
 .section h2 {
   font-size: var(--fs-5);
   margin-bottom: var(--s-6);
+  max-width: 22ch;
 }
 
 .section .prose {
@@ -164,85 +110,9 @@
   margin-top: var(--s-4);
 }
 
-/* decomposition figure */
-.decomp {
-  margin: var(--s-8) 0 0;
-  max-width: 720px;
-}
-
-.decomp .bar {
-  display: flex;
-  height: 44px;
-  border-radius: var(--radius);
-  overflow: hidden;
-  border: 1px solid var(--line-strong);
-}
-
-.decomp .arrives {
-  background: var(--accent-soft);
-}
-
-.decomp .fee {
-  background: var(--fee);
-}
-
-.decomp .margin {
-  background: var(--margin);
-}
-
-.decomp .legend {
-  display: flex;
-  gap: var(--s-6);
-  flex-wrap: wrap;
-  margin-top: var(--s-3);
-  font-size: var(--fs-0);
-  color: var(--ink-muted);
-}
-
-.decomp .legend .swatch {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  margin-right: 6px;
-  vertical-align: baseline;
-}
-
-.decomp figcaption {
-  font-size: var(--fs-1);
-  color: var(--ink-faint);
-  margin-top: var(--s-4);
-  max-width: 62ch;
-}
-
-/* principles */
-.principles {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.principles li {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: var(--s-6);
-  padding: var(--s-6) 0;
-  border-top: 1px solid var(--line);
-}
-
-.principles li:first-child {
-  border-top: none;
-}
-
-.principles .name {
+.section .prose strong {
+  color: var(--ink);
   font-weight: 600;
-  font-size: var(--fs-2);
-}
-
-.principles .detail {
-  color: var(--ink-muted);
-  font-size: var(--fs-1);
-  max-width: 60ch;
 }
 
 /* build log */
@@ -273,10 +143,17 @@
 }
 
 .log .state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: var(--fs-0);
   color: var(--ink-faint);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.log .state svg {
+  flex: none;
 }
 
 .log .state.now {
@@ -297,16 +174,8 @@
 }
 
 @media (max-width: 720px) {
-  .stat-strip {
-    grid-template-columns: 1fr;
-    gap: var(--s-6);
-  }
-  .hero h1 {
-    font-size: var(--fs-6);
-  }
-  .principles li {
-    grid-template-columns: 1fr;
-    gap: var(--s-2);
+  .site-nav {
+    gap: var(--s-4);
   }
   .log li {
     grid-template-columns: 48px 1fr;
