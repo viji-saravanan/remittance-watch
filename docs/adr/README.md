@@ -9,5 +9,6 @@ Immutable once accepted; superseded by writing a new ADR that references its pre
 | [0003](0003-fx-rate-source.md) | exchange-api primary chain; snapshot-first; open.er-api runtime-only | accepted |
 | [0004](0004-deploy-and-environments.md) | Vercel Hobby + Neon free + Actions cron; preview-per-PR | superseded by [0005](0005-github-pages-static-export.md) |
 | [0005](0005-github-pages-static-export.md) | GitHub Pages static export, zero servers; Postgres demoted to CI workspace | accepted |
+| [0006](0006-motion-and-icon-stack.md) | GSAP scroll-story motion (Standard license) + lucide-react icons; progressive-enhancement + mobile-first contract | accepted |
 
-Grounding evidence for all five: [`../research/`](../research/) (verified 2026-08-22).
+Grounding evidence for all six: [`../research/`](../research/) (verified 2026-08-22/23).

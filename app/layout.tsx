@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Public_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -30,6 +30,18 @@ export const metadata: Metadata = {
       "Send $200 home and know what it really costs before you choose a provider.",
     type: "website",
   },
+};
+
+/* Mobile-first contract (ADR-0006 §5): cover notches and let fixed chrome pad
+   with env(safe-area-inset-*). */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#faf9f6" },
+    { media: "(prefers-color-scheme: dark)", color: "#141714" },
+  ],
 };
 
 export default function RootLayout({

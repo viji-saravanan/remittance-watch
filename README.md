@@ -6,8 +6,10 @@
 > No affiliate links. The ranking cannot be bought.
 
 **Status:** M0 shipped — [live on GitHub Pages](https://viji-saravanan.github.io/remittance-watch/).
-M1 (ingestion pipeline) built: 204,469 source rows → 408,938 quotes across 37 quarters,
-contract-tested, idempotent. M2 (cost explorer UI) is next.
+M1 (ingestion pipeline) merged: 204,469 source rows → 408,938 quotes across 37 quarters,
+contract-tested, idempotent, [packaged as a container](https://ghcr.io/viji-saravanan/rw-ingest).
+M2 landing: the page is now a GSAP scroll-driven story (mobile-first, reduced-motion aware,
+readable with JS off) — the corridor explorer itself lands later in M2.
 [Build log →](https://github.com/viji-saravanan/remittance-watch/issues?q=milestone%3A%22M0%22)
 
 ## Why this exists
