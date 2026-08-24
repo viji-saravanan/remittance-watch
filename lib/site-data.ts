@@ -79,9 +79,12 @@ export interface SiteData {
     quarter: string;
   } | null;
   top_corridors: Corridor[];
+  featured_corridors: Corridor[];
   roadmap: { id: string; desc: string; state: string; href: string }[];
 }
 
 export const SITE = raw as SiteData;
 
 export const fmtInt = (n: number): string => n.toLocaleString("en-US");
+
+export const fmtPct = (v: number): string => `${v.toFixed(2)}%`;

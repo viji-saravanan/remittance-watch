@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import Link from "next/link";
 import { BadgeCheck, Circle, Hourglass, MoveRight, Route, Search } from "lucide-react";
 import {
   gsap,
@@ -108,13 +109,13 @@ export function ExplorerTeaser() {
     <section id="story-explorer" ref={scope} className="section explorer">
       <div className="shell explorer-head">
         <p className="eyebrow" data-reveal>
-          <Route size="1em" aria-hidden /> Corridor explorer · in build
+          <Route size="1em" aria-hidden /> Corridor explorer · live
         </p>
         <h2 data-reveal>Search any corridor. See the true cost first.</h2>
         <p className="prose" data-reveal>
           The World Bank prices {SITE.pipeline.corridors} corridors every quarter. The explorer
-          will rank every provider in yours by total cost — fee plus FX margin — with
-          non-disclosers flagged, never silently ranked.
+          ranks every provider on yours by total cost — fee plus FX margin — with non-disclosers
+          flagged, never silently ranked.
         </p>
       </div>
 
@@ -132,15 +133,39 @@ export function ExplorerTeaser() {
       </ul>
 
       <div className="shell">
-        <div className="search-mock pressable" role="presentation">
-          <Search size="1em" aria-hidden />
-          <span className="search-mock__q">Where are you sending?</span>
-          <span className="search-mock__soon">M2</span>
+        {/* the featured family with its real numbers from site-data — each chip
+            opens its ranking in the explorer (M2: India ↔ Gulf on the landing) */}
+        <div className="teaser-featured" data-reveal>
+          <p className="teaser-featured__label">
+            India ↔ Gulf — the world&rsquo;s biggest corridor family, live now:
+          </p>
+          <ul className="teaser-featured__chips">
+            {SITE.featured_corridors.map((c) => (
+              <li key={`${c.from_iso3}-${c.to_iso3}`}>
+                <Link
+                  className="teaser-featured__chip tnum"
+                  href={`/explorer?from=${c.from_iso3}&to=${c.to_iso3}`}
+                  title={`Rank every provider on ${c.from_name} → ${c.to_name}`}
+                >
+                  {c.from_iso3}
+                  <MoveRight size="0.9em" aria-hidden />
+                  {c.to_iso3} <b>{c.avg_cost_pct === null ? "—" : `${c.avg_cost_pct.toFixed(2)}%`}</b>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
 
+        <Link href="/explorer" className="search-mock search-mock--live pressable">
+          <Search size="1em" aria-hidden />
+          <span className="search-mock__q">Where are you sending?</span>
+          <span className="search-mock__tag">Open the explorer</span>
+        </Link>
+
         <p className="prose explorer-log-note" data-reveal style={{ marginBottom: "var(--s-8)" }}>
-          Nothing here is live yet. We&rsquo;re building in the open — each milestone ships as a
-          working, deployed increment, and the build log is the issue tracker.
+          The explorer is live — every corridor the World Bank prices, ranked by true total cost.
+          The rest of the roadmap ships the same way: each milestone lands as a working, deployed
+          increment, and the build log is the issue tracker.
         </p>
         <ol className="log">
           {SITE.roadmap.map((milestone) => (

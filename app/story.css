@@ -696,17 +696,33 @@ body {
   }
 }
 
+/* Since M2 the mock is the real thing: a link into /explorer. */
 .search-mock {
   display: flex;
   align-items: center;
   gap: var(--s-3);
   max-width: 38rem;
+  min-height: 44px;
   margin: 0 auto var(--s-16);
   padding: var(--s-4) var(--s-5);
   background: var(--bg-raised);
   border: 1.5px solid var(--line-strong);
   border-radius: var(--radius);
   color: var(--accent);
+  text-decoration: none;
+  transition: border-color var(--dur-press) var(--ease-out),
+    transform var(--dur-press) var(--ease-out), box-shadow var(--dur-press) var(--ease-out);
+}
+
+.search-mock--live:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.search-mock--live:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .search-mock__q {
@@ -715,14 +731,69 @@ body {
   font-size: var(--fs-2);
 }
 
-.search-mock__soon {
+.search-mock__tag {
   font-size: var(--fs-0);
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--accent-ink);
+  background: var(--accent);
   border-radius: 999px;
   padding: 3px 10px;
+  white-space: nowrap;
+}
+
+/* featured India ↔ Gulf strip — real averages from site-data, each chip a
+   deep link into the explorer's ranking for that corridor */
+.teaser-featured {
+  max-width: 38rem;
+  margin: 0 auto var(--s-6);
+  display: grid;
+  gap: var(--s-2);
+  justify-items: center;
+}
+
+.teaser-featured__label {
+  font-size: var(--fs-1);
+  color: var(--ink-muted);
+}
+
+.teaser-featured__chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s-2);
+  list-style: none;
+  padding: 0; /* lists ship with 40px inline-start indent — no global reset */
+}
+
+.teaser-featured__chip {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-3);
+  font-size: var(--fs-1);
+  color: var(--ink-muted);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  text-decoration: none;
+  transition: border-color var(--dur-press) var(--ease-out), color var(--dur-press) var(--ease-out);
+}
+
+.teaser-featured__chip b {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.teaser-featured__chip:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.teaser-featured__chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .explorer-log-note {
