@@ -1,0 +1,713 @@
+/* Corridor explorer (M2) — the one page that is a tool, not a story.
+   Everything rides the token scale (rem → root clamp → same proportions from
+   a phone to a 4K display) and both themes come free via tokens. No pins, no
+   smoother: ADR-0006's motion contract is story-only, so the only animation
+   here is the loading shimmer, which reduced-motion turns off. */
+
+.ex-shell {
+  padding-top: var(--s-8);
+  padding-bottom: var(--s-16);
+}
+
+/* landing.css scopes .prose to .section — the explorer isn't a story section,
+   so the intro and headline carry their own type here */
+.ex-shell h1 {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: var(--fs-6);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: var(--s-3);
+}
+
+.ex-intro {
+  max-width: var(--measure);
+  margin-top: var(--s-4);
+  font-size: var(--fs-2);
+  line-height: 1.55;
+  color: var(--ink-muted);
+}
+
+.ex > * + * {
+  margin-top: var(--s-12);
+}
+
+/* the client root follows the shell's intro — the * + * rule above only
+   spaces children INSIDE .ex */
+.ex {
+  margin-top: var(--s-8);
+}
+
+/* ── search row ─────────────────────────────────────────────────────────── */
+
+.ex-pickers {
+  display: flex;
+  align-items: end;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+.ex-field {
+  display: grid;
+  gap: var(--s-1);
+  flex: 1 1 12rem;
+  max-width: 20rem;
+  font-size: var(--fs-1);
+}
+
+.ex-field span {
+  color: var(--ink-muted);
+  font-size: var(--fs-0);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ex-field select {
+  min-height: 44px;
+  padding: 0 var(--s-3);
+  font: inherit;
+  font-size: var(--fs-2);
+  color: var(--ink);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+}
+
+.ex-swap {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-muted);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: color var(--dur-press) var(--ease-out), border-color var(--dur-press) var(--ease-out);
+}
+
+.ex-swap:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* amount tiers — a segmented control over the only two real published amounts */
+.ex-tier {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-raised);
+}
+
+.ex-tier label {
+  position: relative;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--s-4);
+  font-size: var(--fs-2);
+  color: var(--ink-muted);
+  cursor: pointer;
+  border-left: 1px solid var(--line);
+}
+
+.ex-tier label:first-of-type {
+  border-left: 0;
+}
+
+.ex-tier input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ex-tier label.is-on {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.ex-tier label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* featured family — India ↔ Gulf chips */
+.ex-featured {
+  margin-top: var(--s-4);
+  display: grid;
+  gap: var(--s-2);
+}
+
+.ex-featured-label {
+  font-size: var(--fs-0);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.ex-featured-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.ex-chip {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-3);
+  font: inherit;
+  font-size: var(--fs-1);
+  color: var(--ink-muted);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color var(--dur-press) var(--ease-out), color var(--dur-press) var(--ease-out);
+}
+
+.ex-chip b {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.ex-chip:hover,
+.ex-chip.is-on {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.ex-chip.is-on {
+  background: var(--accent-soft);
+}
+
+/* ── result head ────────────────────────────────────────────────────────── */
+
+.ex-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: var(--s-3);
+}
+
+.ex-route {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: var(--fs-5);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.ex-vintage {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-1);
+  color: var(--ink-muted);
+}
+
+.ex-vintage-note {
+  color: var(--ink-faint);
+}
+
+.ex-summary {
+  margin-top: var(--s-4);
+  font-size: var(--fs-1);
+  color: var(--ink-muted);
+}
+
+.ex-summary b {
+  color: var(--ink);
+}
+
+/* ── ranked rows ────────────────────────────────────────────────────────── */
+
+.ex-rows {
+  margin-top: var(--s-4);
+  display: grid;
+  gap: var(--s-2);
+  list-style: none;
+}
+
+.ex-row {
+  display: grid;
+  grid-template-columns: 2rem minmax(11rem, 17rem) 1fr auto;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.ex-row.is-negative {
+  border-color: var(--line-strong);
+  background: var(--accent-soft);
+}
+
+/* the tinted card is a step darker/lighter than the page, so its secondary
+   text steps up to muted — faint would drop under 4.5:1 on accent-soft */
+.ex-row.is-negative .ex-quiet {
+  color: var(--ink-muted);
+}
+
+.ex-rank {
+  color: var(--ink-faint);
+  font-size: var(--fs-1);
+}
+
+.ex-who {
+  display: grid;
+  gap: var(--s-1);
+  font-size: var(--fs-2);
+  min-width: 0;
+}
+
+.ex-who b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ex-quiet {
+  color: var(--ink-faint);
+  font-size: var(--fs-0);
+}
+
+.ex-badge {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: 0.125rem var(--s-2);
+  font-size: var(--fs-0);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 999px;
+  width: fit-content;
+}
+
+/* the composition bar: fee (green) then margin (orange) on a shared track;
+   with a negative margin the zero axis moves right and the margin extends
+   back LEFT past it, so a negative total literally ends behind zero */
+.ex-bar {
+  position: relative;
+  height: 1.75rem;
+  background: color-mix(in srgb, var(--line) 45%, transparent);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ex-seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.ex-seg--fee {
+  background: var(--fee);
+}
+
+.ex-seg--margin {
+  background: var(--margin);
+}
+
+.ex-bar-zero {
+  position: absolute;
+  top: -0.25rem;
+  bottom: -0.25rem;
+  width: 2px;
+  background: var(--ink);
+  opacity: 0.75;
+}
+
+.ex-total {
+  display: grid;
+  gap: 0.125rem;
+  justify-items: end;
+  font-size: var(--fs-3);
+}
+
+.ex-total .ex-quiet {
+  font-size: var(--fs-0);
+}
+
+.ex-negnote {
+  grid-column: 2 / -1;
+  font-size: var(--fs-0);
+  color: var(--ink-muted);
+  max-width: var(--measure);
+}
+
+/* flagged (non-transparent) quotes — visible, never ranked */
+.ex-flagged {
+  margin-top: var(--s-4);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  padding: var(--s-3) var(--s-4);
+}
+
+.ex-flagged summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-1);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.ex-flagged-list {
+  margin-top: var(--s-2);
+  display: grid;
+  gap: var(--s-2);
+}
+
+.ex-flagged-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  font-size: var(--fs-1);
+}
+
+/* ── trend chart ────────────────────────────────────────────────────────── */
+
+.trend {
+  margin-top: var(--s-12);
+  display: grid;
+  gap: var(--s-3);
+}
+
+.trend-caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+  font-size: var(--fs-1);
+  color: var(--ink-muted);
+}
+
+.trend-caption b {
+  color: var(--ink);
+}
+
+.trend-legend {
+  display: inline-flex;
+  gap: var(--s-4);
+}
+
+.trend-key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  font-size: var(--fs-0);
+}
+
+.trend-key i,
+.trend-end i,
+.trend-tip i {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.trend-plot {
+  position: relative;
+  height: 12rem;
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.trend-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--line);
+}
+
+.trend-tick {
+  position: absolute;
+  left: 0;
+  top: -0.75em;
+  transform: translateY(-100%);
+  padding: 0 var(--s-1);
+  font-size: var(--fs-0);
+  color: var(--ink-faint);
+  background: var(--bg);
+}
+
+.trend-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.trend-dot {
+  position: absolute;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.trend-end {
+  position: absolute;
+  transform: translate(0.375rem, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  font-size: var(--fs-0);
+  color: var(--ink);
+  background: var(--bg);
+  padding: 0.125rem var(--s-1);
+  border-radius: var(--radius);
+  white-space: nowrap;
+}
+
+.trend-end--low {
+  transform: translate(0.375rem, -30%);
+}
+
+/* quarter columns: the keyboard-focusable hover/focus layer */
+.trend-col {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: crosshair;
+}
+
+.trend-col.is-active {
+  background: color-mix(in srgb, var(--line) 40%, transparent);
+}
+
+.trend-col:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.trend-tip {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 0.125rem;
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--fs-0);
+  color: var(--ink);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 0.25rem 1rem color-mix(in srgb, var(--ink) 12%, transparent);
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.trend-tip span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+
+.trend-xlabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-0);
+  color: var(--ink-faint);
+}
+
+/* the same numbers without color or hover — always one glance away on
+   touch-width screens where the hover layer doesn't exist */
+.trend-table {
+  display: none;
+  font-size: var(--fs-1);
+}
+
+.trend-table th,
+.trend-table td {
+  text-align: right;
+  padding: var(--s-2) var(--s-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.trend-table th[scope="row"],
+.trend-table thead th:first-child {
+  text-align: left;
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+/* ── states ─────────────────────────────────────────────────────────────── */
+
+.ex-state {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-3);
+  margin-top: var(--s-8);
+  padding: var(--s-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink-muted);
+  font-size: var(--fs-2);
+  max-width: var(--measure);
+}
+
+.ex-state svg {
+  color: var(--ink-faint);
+}
+
+.ex-state--error {
+  border-color: color-mix(in srgb, var(--margin) 45%, transparent);
+}
+
+.ex-retry {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-4);
+  font: inherit;
+  font-size: var(--fs-1);
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.ex-suggest {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  font-size: var(--fs-1);
+}
+
+/* loading skeleton — the real first frame of the bundle fetch */
+.ex-state--loading {
+  border: 0;
+  padding: 0;
+  margin-top: var(--s-8);
+  display: grid;
+  gap: var(--s-3);
+  max-width: none;
+}
+
+.ex-skel {
+  border-radius: var(--radius);
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--line) 55%, transparent) 40%,
+    color-mix(in srgb, var(--line-strong) 55%, transparent) 50%,
+    color-mix(in srgb, var(--line) 55%, transparent) 60%
+  );
+  background-size: 200% 100%;
+  animation: ex-shimmer 1.4s linear infinite;
+}
+
+.ex-skel--pickers {
+  height: 4.5rem;
+}
+
+.ex-skel--head {
+  height: 3rem;
+  width: 60%;
+}
+
+.ex-skel--row {
+  height: 4.25rem;
+}
+
+@keyframes ex-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+
+/* ── methodology ────────────────────────────────────────────────────────── */
+
+.ex-method {
+  border-top: 1px solid var(--line);
+  padding-top: var(--s-4);
+}
+
+.ex-method summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-1);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.ex-method p {
+  max-width: var(--measure);
+  margin-top: var(--s-3);
+  font-size: var(--fs-1);
+  color: var(--ink-muted);
+}
+
+/* ── responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .ex > * + * {
+    margin-top: var(--s-8);
+  }
+
+  .ex-row {
+    grid-template-columns: 1.5rem 1fr auto;
+    row-gap: var(--s-3);
+  }
+
+  /* bar drops to its own full-width line under the provider */
+  .ex-bar {
+    grid-column: 1 / -1;
+  }
+
+  .ex-negnote {
+    grid-column: 1 / -1;
+  }
+
+  .ex-total {
+    font-size: var(--fs-2);
+  }
+
+  .trend-plot {
+    height: 9rem;
+  }
+
+  .trend-table {
+    display: table;
+  }
+
+  .trend-end {
+    display: none; /* end labels collide at phone width — the table carries the numbers */
+  }
+
+  .ex-vintage-note {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ex-skel {
+    animation: none;
+  }
+}

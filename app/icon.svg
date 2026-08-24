@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- RemitWatch mark: a transfer arriving — arrow down onto the arrival line -->
+  <rect width="64" height="64" rx="14" fill="#0d6b4d"/>
+  <path d="M32 12v24m0 0L21 25m11 11l11-11" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M17 50h30" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+</svg>

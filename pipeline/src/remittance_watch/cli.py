@@ -57,6 +57,15 @@ def main(argv: list[str] | None = None) -> int:
         help="output path relative to the repo root (default: app/data/site-data.json)",
     )
 
+    p_explorer = sub.add_parser(
+        "export-explorer",
+        help="emit the versioned corridor-explorer bundle (public/data/rpw-explorer-v1.json, ADR-0008)",
+    )
+    p_explorer.add_argument(
+        "--out", type=Path, default=Path("public/data/rpw-explorer-v1.json"),
+        help="output path relative to the repo root (default: public/data/rpw-explorer-v1.json)",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "migrate":
@@ -69,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
         _verify()
     elif args.command == "export-site-data":
         _export_site_data(args.out)
+    elif args.command == "export-explorer":
+        _export_explorer(args.out)
     return 0
 
 
@@ -142,6 +153,17 @@ def _export_site_data(out: Path) -> None:
         written = export_site_data(conn, out)
     print(f"wrote: {written}")
     print("the site imports this file at build time — regenerate after every re-ingest")
+
+
+def _export_explorer(out: Path) -> None:
+    from .explorer_export import export_explorer_data
+
+    if not out.is_absolute():
+        out = Path(__file__).resolve().parents[3] / out  # repo-relative, same rule as site data
+    with db.connect() as conn:
+        written = export_explorer_data(conn, out)
+    print(f"wrote: {written}")
+    print("the explorer fetches this bundle at runtime — regenerate after every re-ingest")
 
 
 def _verify() -> None:

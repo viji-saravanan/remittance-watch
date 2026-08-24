@@ -21,7 +21,7 @@ table simply renders without an arc rather than with a guessed position.
 
 import json
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
 # ── cited constants (published third-party figures, with provenance) ──────
@@ -61,7 +61,7 @@ REPO = "https://github.com/viji-saravanan/remittance-watch"
 ROADMAP = [
     {"id": "M0", "desc": "Skeleton, design system, CI, deploy", "state": "shipped", "href": f"{REPO}/issues/2"},
     {"id": "M1", "desc": "World Bank workbook → tested Postgres dataset", "state": "shipped", "href": f"{REPO}/issues/3"},
-    {"id": "M2", "desc": "Corridor search & true-cost ranking UI", "state": "in progress", "href": f"{REPO}/issues/4"},
+    {"id": "M2", "desc": "Corridor search & true-cost ranking UI", "state": "shipped", "href": f"{REPO}/issues/4"},
     {"id": "M3", "desc": "Public API for researchers & journalists", "state": "queued", "href": f"{REPO}/issues/5"},
     {"id": "M4", "desc": "Live FX overlay, price-drop alerts, Hindi", "state": "queued", "href": f"{REPO}/issues/6"},
     {"id": "M5", "desc": "Methodology, accessibility, launch", "state": "queued", "href": f"{REPO}/issues/7"},
@@ -72,6 +72,10 @@ ROADMAP = [
 DIGITAL_ACCESS_POINTS = ("Internet", "Mobile phone")
 
 TOP_CORRIDOR_COUNT = 14
+
+# The world's largest remittance corridor family: the Gulf states ↔ India.
+# "Featured on landing" per the M2 issue — computed, not hardcoded corridors.
+GCC_ISO3 = ("ARE", "BHR", "KWT", "OMN", "QAT", "SAU")
 
 COST_BANDS = (3, 6, 9, 12, 15)  # upper bounds in %; last band is "15%+"
 
@@ -119,7 +123,14 @@ COUNTRY_COORDS: dict[str, tuple[float, float]] = {
 
 
 def _r(value: Decimal | float | None, ndigits: int = 2) -> float | None:
-    return None if value is None else round(float(value), ndigits)
+    """Round like the database does: Postgres ROUND(numeric) is half-away-from-
+    zero on exact decimals, while round(float) follows binary representation —
+    a fee of exactly 0.495 must not become 0.49 in the artifact and 0.50 in an
+    independent SQL hand-check of the same row."""
+    if value is None:
+        return None
+    quantum = Decimal(1).scaleb(-ndigits)
+    return float(Decimal(value).quantize(quantum, rounding=ROUND_HALF_UP))
 
 
 def _latest_quarter(conn) -> tuple[int, str]:
@@ -300,6 +311,47 @@ def _top_corridors(conn, quarter_id: int, limit: int) -> list[dict]:
     return corridors
 
 
+def _featured_corridors(conn, quarter_id: int) -> list[dict]:
+    """The India ↔ GCC family — the world's largest remittance corridor family,
+    featured on the landing (M2 issue). Same shape as top_corridors so the
+    landing can render both with one component. Ordered by quote count."""
+    gcc = ", ".join(f"'{iso}'" for iso in GCC_ISO3)
+    rows = conn.execute(
+        f"""
+        SELECT c.source_iso3, c.dest_iso3, cs.name, cd.name,
+               COUNT(*) FILTER (WHERE qu.transparent AND qu.total_cost_pct IS NOT NULL) AS quotes,
+               AVG(qu.total_cost_pct) FILTER (WHERE qu.transparent AND qu.total_cost_pct IS NOT NULL)
+        FROM quotes qu
+        JOIN corridors c  ON c.id = qu.corridor_id
+        JOIN countries cs ON cs.iso3 = c.source_iso3
+        JOIN countries cd ON cd.iso3 = c.dest_iso3
+        WHERE qu.quarter_id = %s AND qu.amount_usd = 200
+          AND ((c.source_iso3 = 'IND' AND c.dest_iso3 IN ({gcc}))
+               OR (c.dest_iso3 = 'IND' AND c.source_iso3 IN ({gcc})))
+        GROUP BY 1, 2, 3, 4, c.code
+        HAVING COUNT(*) FILTER (WHERE qu.transparent AND qu.total_cost_pct IS NOT NULL) > 0
+        ORDER BY quotes DESC, c.code ASC
+        """,
+        (quarter_id,),
+    ).fetchall()
+
+    corridors = []
+    for src, dst, src_name, dst_name, quotes, avg in rows:
+        entry = {
+            "from_iso3": src,
+            "to_iso3": dst,
+            "from_name": src_name,
+            "to_name": dst_name,
+            "quotes": int(quotes),
+            "avg_cost_pct": _r(avg),
+        }
+        if src in COUNTRY_COORDS and dst in COUNTRY_COORDS:
+            entry["from_ll"] = list(COUNTRY_COORDS[src])
+            entry["to_ll"] = list(COUNTRY_COORDS[dst])
+        corridors.append(entry)
+    return corridors
+
+
 def build_site_data(conn) -> dict:
     quarter_id, quarter_label = _latest_quarter(conn)
     pipeline = _pipeline_stats(conn)
@@ -316,6 +368,7 @@ def build_site_data(conn) -> dict:
         "computed": _computed(conn, quarter_id, quarter_label),
         "anatomy": _anatomy(conn, quarter_id, quarter_label),
         "top_corridors": _top_corridors(conn, quarter_id, TOP_CORRIDOR_COUNT),
+        "featured_corridors": _featured_corridors(conn, quarter_id),
         "roadmap": ROADMAP,
     }
 

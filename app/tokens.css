@@ -7,7 +7,7 @@
   --bg-raised: #ffffff;
   --ink: #1d211d;
   --ink-muted: #5b625b;
-  --ink-faint: #8a918a;
+  --ink-faint: #6d746d; /* ≥4.5:1 on --bg and --bg-raised (WCAG AA small text) */
   --line: #e5e3db;
   --line-strong: #cfcdbf;
   --accent: #0d6b4d;
@@ -16,6 +16,11 @@
   --fee: #0d6b4d;      /* stacked-bar: the fee you see */
   --margin: #c2410c;   /* stacked-bar: the margin you don't */
   --warn: #b45309;
+  /* trend-chart series (explorer): cheapest = green, corridor average = steel
+     blue. Validated pair on --bg — CVD ΔE 16.9, normal 19.7, chroma ≥ 0.1
+     (dataviz six-checks); blue stays clear of --margin's orange identity. */
+  --chart-1: #0c7d52;
+  --chart-2: #4c6fbf;
 
   /* type scale · 1.25 ratio */
   --fs-0: 0.8125rem;
@@ -57,7 +62,7 @@
     --bg-raised: #1b1f1b;
     --ink: #e9ebe5;
     --ink-muted: #a4aba3;
-    --ink-faint: #737a72;
+    --ink-faint: #868d86; /* ≥4.5:1 on --bg and --bg-raised (WCAG AA small text) */
     --line: #2a2f2a;
     --line-strong: #3a403a;
     --accent: #43cf95;
@@ -66,5 +71,9 @@
     --fee: #43cf95;
     --margin: #f0742e;
     --warn: #e8a04c;
+    /* darker steps than the accents: the dark-mode lightness band tops out
+       lower (validated: CVD ΔE 20.6 on #141714) */
+    --chart-1: #23a05f;
+    --chart-2: #4a7fd6;
   }
 }
