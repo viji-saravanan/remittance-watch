@@ -57,6 +57,9 @@ export default function ExplorerPage() {
         </Suspense>
 
         <noscript>
+          {/* without JS the island's skeleton would shimmer forever above this
+              fallback — hide it, the static content below is the whole page */}
+          <style>{`.ex-state--loading { display: none !important; }`}</style>
           <section className="ex-state">
             <p>
               The interactive ranking needs JavaScript — it fetches a static JSON bundle this

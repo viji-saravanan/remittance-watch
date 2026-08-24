@@ -70,16 +70,27 @@ export async function fetchExplorerData(signal?: AbortSignal): Promise<ExplorerD
   return (await res.json()) as ExplorerData;
 }
 
-/** Ranked (transparent) and flagged (non-transparent) quotes for one corridor
-    and tier. The exporter pre-sorts cheapest-first within corridor×tier, so
-    filtering preserves the ADR-0007 ranking — the client never re-sorts. */
+/** A quote that can rank: transparent AND with a published total cost. The
+    narrowing is what keeps every rendered number traceable — ranked rows can
+    never fall back to a computed or zero total downstream. */
+export type RankedQuote = ExplorerQuote & { tc: number };
+
+/** Ranked and flagged quotes for one corridor and tier. The exporter pre-sorts
+    cheapest-first within corridor×tier, so filtering preserves the ADR-0007
+    ranking — the client never re-sorts. Ranking needs BOTH disclosures: a row
+    that hides the margin, or publishes no total, is flagged instead — shown,
+    never ranked (no quote silently vanishes). */
 export function splitQuotes(
   data: ExplorerData,
   corridorIndex: number,
   tier: number,
-): { ranked: ExplorerQuote[]; flagged: ExplorerQuote[] } {
+): { ranked: RankedQuote[]; flagged: ExplorerQuote[] } {
   const rows = data.quotes.filter((q) => q.c === corridorIndex && q.t === tier);
-  return { ranked: rows.filter((q) => q.x), flagged: rows.filter((q) => !q.x) };
+  const rankable = (q: ExplorerQuote): q is RankedQuote => q.x && q.tc !== null;
+  return {
+    ranked: rows.filter(rankable),
+    flagged: rows.filter((q) => !rankable(q)),
+  };
 }
 
 export const fmtPct = (v: number): string => `${v.toFixed(2)}%`;

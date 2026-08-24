@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeftRight,
@@ -17,7 +17,7 @@ import {
   fmtPct,
   fmtUsd,
   type ExplorerData,
-  type ExplorerQuote,
+  type RankedQuote,
 } from "../../lib/explorer-data";
 import { Loading } from "./Loading";
 import { TrendChart } from "./TrendChart";
@@ -64,7 +64,9 @@ export function ExplorerClient() {
         to: next.to ?? to,
         amt: String(next.amt ?? tier),
       });
-      router.replace(`?${q}`, { scroll: false });
+      // push, not replace: each selection is a history step, so Back undoes
+      // the last corridor/tier choice instead of leaving the explorer
+      router.push(`?${q}`, { scroll: false });
     },
     [router, from, to, tier],
   );
@@ -101,10 +103,17 @@ function Explorer({
 }) {
   const { meta, countries, corridors } = ready;
 
+  /* URL params are untrusted input: an unknown or stale ISO code would leave
+     the controlled selects showing a country that isn't selected — fall back
+     to the defaults instead. */
+  const knownIso = useMemo(() => new Set(countries.map((c) => c.iso3)), [countries]);
+  const fromIso = knownIso.has(from) ? from : DEFAULT_FROM;
+  const toIso = knownIso.has(to) ? to : DEFAULT_TO;
+
   const byName = useMemo(() => new Map(countries.map((c) => [c.iso3, c.name])), [countries]);
   const corridorIdx = useMemo(
-    () => corridors.findIndex((c) => c.from === from && c.to === to),
-    [corridors, from, to],
+    () => corridors.findIndex((c) => c.from === fromIso && c.to === toIso),
+    [corridors, fromIso, toIso],
   );
   const corridor = corridorIdx >= 0 ? corridors[corridorIdx] : null;
   const { ranked, flagged } = useMemo(
@@ -127,10 +136,21 @@ function Explorer({
   const suggestions = useMemo(() => {
     if (corridor) return [];
     return corridors
-      .filter((c) => c.from === from || c.to === to)
+      .filter((c) => c.from === fromIso || c.to === toIso)
       .sort((a, b) => b.quotes - a.quotes)
       .slice(0, 5);
-  }, [corridors, corridor, from, to]);
+  }, [corridors, corridor, fromIso, toIso]);
+
+  /* activating a suggestion unmounts the button that fired it — move focus to
+     the result heading so keyboard users land on what they asked for */
+  const routeRef = useRef<HTMLHeadingElement>(null);
+  const focusRoute = useRef(false);
+  useEffect(() => {
+    if (corridor && focusRoute.current) {
+      routeRef.current?.focus();
+      focusRoute.current = false;
+    }
+  }, [corridor]);
 
   return (
     <div className="ex">
@@ -139,7 +159,7 @@ function Explorer({
         <div className="ex-pickers">
           <label className="ex-field">
             <span>From</span>
-            <select value={from} onChange={(e) => onNavigate({ from: e.target.value })}>
+            <select value={fromIso} onChange={(e) => onNavigate({ from: e.target.value })}>
               {countries.map((c) => (
                 <option key={c.iso3} value={c.iso3}>
                   {c.name}
@@ -151,14 +171,14 @@ function Explorer({
             type="button"
             className="ex-swap"
             title="Swap direction"
-            onClick={() => onNavigate({ from: to, to: from })}
+            onClick={() => onNavigate({ from: toIso, to: fromIso })}
           >
             <ArrowLeftRight size="1em" aria-hidden />
             <span className="sr-only">Swap origin and destination</span>
           </button>
           <label className="ex-field">
             <span>To</span>
-            <select value={to} onChange={(e) => onNavigate({ to: e.target.value })}>
+            <select value={toIso} onChange={(e) => onNavigate({ to: e.target.value })}>
               {countries.map((c) => (
                 <option key={c.iso3} value={c.iso3}>
                   {c.name}
@@ -188,12 +208,13 @@ function Explorer({
             <span className="ex-featured-label">India ↔ Gulf — the world&rsquo;s biggest corridor family</span>
             <div className="ex-featured-chips">
               {featured.map((c) => {
-                const on = c.from === from && c.to === to;
+                const on = c.from === fromIso && c.to === toIso;
                 return (
                   <button
                     key={`${c.from}-${c.to}`}
                     type="button"
                     className={`ex-chip tnum${on ? " is-on" : ""}`}
+                    aria-pressed={on}
                     onClick={() => onNavigate({ from: c.from, to: c.to })}
                   >
                     {c.from}
@@ -211,7 +232,7 @@ function Explorer({
       {corridor ? (
         <section aria-label={`Providers on ${corridor.from_name} to ${corridor.to_name}`}>
           <header className="ex-head">
-            <h2 className="ex-route">
+            <h2 ref={routeRef} tabIndex={-1} className="ex-route">
               {corridor.from_name} <span aria-hidden="true">→</span> {corridor.to_name}
             </h2>
             <p className="ex-vintage" title={`Bundle generated ${meta.generated_utc}`}>
@@ -222,14 +243,20 @@ function Explorer({
 
           {ranked.length > 0 ? (
             <>
-              <p className="ex-summary tnum">
-                {ranked.length} providers ranked by total cost · cheapest{" "}
-                <b>{fmtPct(ranked[0]!.tc ?? 0)}</b> ({fmtUsd(ranked[0]!.tc ?? 0, tier)}) · average{" "}
-                <b>{corridor.avg_cost_pct === null ? "—" : fmtPct(corridor.avg_cost_pct)}</b>
+              {/* the summary is the corridor/tier change announcer: screen
+                  readers hear the new totals without hunting the list */}
+              <p className="ex-summary tnum" aria-live="polite">
+                {ranked.length} quote{ranked.length === 1 ? "" : "s"} ranked by total cost ·
+                cheapest <b>{fmtPct(ranked[0]!.tc)}</b> ({fmtUsd(ranked[0]!.tc, tier)}) · average{" "}
+                <b>{fmtPct(ranked.reduce((s, q) => s + q.tc, 0) / ranked.length)}</b> of a ${tier}{" "}
+                transfer
               </p>
-              <ol className="ex-rows">
+              {/* role="list": Safari drops ol semantics when list-style:none;
+                  the rank numerals stay visible text so order survives that too.
+                  Rows are immutable per view — positional keys. */}
+              <ol className="ex-rows" role="list">
                 {ranked.map((q, i) => (
-                  <Row key={`${q.p}-${q.i}-${q.a ?? ""}`} quote={q} rank={i + 1} tier={tier} />
+                  <Row key={i} quote={q} rank={i + 1} tier={tier} />
                 ))}
               </ol>
             </>
@@ -272,8 +299,8 @@ function Explorer({
         <div className="ex-state" role="status">
           <SearchX size="1.5em" aria-hidden />
           <p>
-            No {byName.get(from) ?? from} → {byName.get(to) ?? to} prices in {meta.quarter}. The
-            World Bank doesn&rsquo;t survey every corridor every quarter.
+            No {byName.get(fromIso) ?? fromIso} → {byName.get(toIso) ?? toIso} prices in{" "}
+            {meta.quarter}. The World Bank doesn&rsquo;t survey every corridor every quarter.
           </p>
           {suggestions.length > 0 && (
             <div className="ex-suggest">
@@ -283,7 +310,10 @@ function Explorer({
                   key={`${c.from}-${c.to}`}
                   type="button"
                   className="ex-chip"
-                  onClick={() => onNavigate({ from: c.from, to: c.to })}
+                  onClick={() => {
+                    focusRoute.current = true;
+                    onNavigate({ from: c.from, to: c.to });
+                  }}
                 >
                   {c.from}→{c.to} <b>{c.avg_cost_pct === null ? "—" : fmtPct(c.avg_cost_pct)}</b>
                 </button>
@@ -314,19 +344,17 @@ function Explorer({
    composition on a shared zero axis — fee (green) extends right from zero,
    the margin (orange) continues right or extends back LEFT when negative —
    so a negative total genuinely reads as ending behind zero. Rows with no
-   negatives render as a plain stacked bar (zero axis sits at the left edge). */
-function Row({ quote, rank, tier }: { quote: ExplorerQuote; rank: number; tier: number }) {
-  const fee = quote.f ?? 0;
-  const margin = quote.m ?? 0;
-  const total = quote.tc ?? fee + margin;
+   negatives render as a plain stacked bar (zero axis sits at the left edge).
+   RankedQuote guarantees tc is the published number: no computed fallbacks. */
+function Row({ quote, rank, tier }: { quote: RankedQuote; rank: number; tier: number }) {
+  const margin = quote.m ?? 0; // transparent ⇒ disclosed; ?? only satisfies types
+  const total = quote.tc;
   const negativeMargin = margin < 0;
   const negativeTotal = total < 0;
 
   return (
     <li className={`ex-row${negativeTotal ? " is-negative" : ""}`}>
-      <span className="ex-rank tnum" aria-hidden="true">
-        {rank}
-      </span>
+      <span className="ex-rank tnum">{rank}</span>
       <div className="ex-who">
         <b>{quote.p}</b>
         <span className="ex-quiet">
@@ -339,7 +367,7 @@ function Row({ quote, rank, tier }: { quote: ExplorerQuote; rank: number; tier: 
           </span>
         )}
       </div>
-      <CostBar fee={fee} margin={margin} />
+      <CostBar fee={quote.f} margin={margin} />
       <div className="ex-total tnum">
         <b>{fmtPct(total)}</b>
         <span className="ex-quiet">{fmtUsd(total, tier)} per ${tier}</span>
@@ -349,21 +377,23 @@ function Row({ quote, rank, tier }: { quote: ExplorerQuote; rank: number; tier: 
   );
 }
 
-function CostBar({ fee, margin }: { fee: number; margin: number }) {
+function CostBar({ fee, margin }: { fee: number | null; margin: number }) {
   /* scale is per-row (each bar fills its track) but the ZERO AXIS is what
      carries meaning for negatives: the track spans [−|margin| … +fee], so the
      marker sits where the negative side ends — a published fee of 0 puts zero
      at the right edge with the whole track behind it. The signed numbers
-     beside every bar keep the cross-row comparison honest. */
-  const magnitude = Math.max(fee + Math.abs(margin), 0.01);
+     beside every bar keep the cross-row comparison honest. A null fee renders
+     as no segment and SAYS so — an undisclosed fee is never described as 0. */
+  const f = fee ?? 0;
+  const magnitude = Math.max(f + Math.abs(margin), 0.01);
   const zeroX = margin < 0 ? (Math.abs(margin) / magnitude) * 100 : 0;
-  const feeW = (fee / magnitude) * 100;
+  const feeW = (f / magnitude) * 100;
   const marginW = (Math.abs(margin) / magnitude) * 100;
   return (
     <div
       className="ex-bar"
       role="img"
-      aria-label={`Fee ${fee.toFixed(2)} percent, exchange-rate margin ${margin.toFixed(2)} percent`}
+      aria-label={`${fee === null ? "Fee not disclosed" : `Fee ${fee.toFixed(2)} percent`}, exchange-rate margin ${margin.toFixed(2)} percent`}
     >
       {margin < 0 && (
         <i
@@ -372,7 +402,7 @@ function CostBar({ fee, margin }: { fee: number; margin: number }) {
           aria-hidden="true"
         />
       )}
-      {fee > 0 && (
+      {(fee ?? 0) > 0 && (
         <i
           className="ex-seg ex-seg--fee"
           style={margin < 0 ? { left: `${zeroX}%`, width: `${feeW}%` } : { left: 0, width: `${feeW}%` }}

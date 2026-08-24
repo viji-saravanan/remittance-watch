@@ -133,34 +133,51 @@ export function TrendChart({ trend }: { trend: TrendPoint[] }) {
           </span>
         )}
 
-        {/* keyboard-focusable quarter columns: the hover/focus + tooltip layer */}
-        {trend.map((p, i) => (
-          <button
-            key={p.q}
-            type="button"
-            className={`trend-col${active === i ? " is-active" : ""}`}
-            style={{ left: `${((x(i - 1) + x(i)) / 2 || 0)}%`, width: `${100 / n}%` }}
-            aria-label={`${p.q}: average ${p.avg === null ? "no data" : fmtPct(p.avg)}, cheapest ${
-              p.cheapest === null ? "no data" : fmtPct(p.cheapest)
-            }`}
-            onMouseEnter={() => setActive(i)}
-            onMouseLeave={() => setActive(null)}
-            onFocus={() => setActive(i)}
-            onBlur={() => setActive(null)}
-          >
-            {active === i && (
-              <span className="trend-tip tnum" role="presentation">
-                <b>{p.q.replace("_", " ")}</b>
-                {series.map((s) => (
-                  <span key={s.key}>
-                    <i style={{ background: s.color }} />
-                    {s.label}: {p[s.key] === null ? "—" : fmtPct(p[s.key] as number)}
-                  </span>
-                ))}
-              </span>
-            )}
-          </button>
-        ))}
+        {/* keyboard-focusable quarter columns: the hover/focus + tooltip layer.
+            Columns overlap the plot edges by design, so the edge tooltips are
+            pulled back by each column's own overhang — flush with the plot,
+            never overflowing it (WCAG 1.4.10 reflow at phone widths). */}
+        {trend.map((p, i) => {
+          const colLeft = (x(i - 1) + x(i)) / 2 || 0;
+          const colW = 100 / n;
+          return (
+            <button
+              key={p.q}
+              type="button"
+              className={`trend-col${active === i ? " is-active" : ""}`}
+              style={{ left: `${colLeft}%`, width: `${colW}%` }}
+              aria-label={`${p.q}: average ${p.avg === null ? "no data" : fmtPct(p.avg)}, cheapest ${
+                p.cheapest === null ? "no data" : fmtPct(p.cheapest)
+              }`}
+              onMouseEnter={() => setActive(i)}
+              onMouseLeave={() => setActive(null)}
+              onFocus={() => setActive(i)}
+              onBlur={() => setActive(null)}
+            >
+              {active === i && (
+                <span
+                  className={`trend-tip tnum${i === 0 ? " trend-tip--start" : i === n - 1 ? " trend-tip--end" : ""}`}
+                  role="presentation"
+                  style={
+                    i === 0
+                      ? { left: `${(-colLeft / colW) * 100}%` } // cancel the column's left overhang
+                      : i === n - 1
+                        ? { right: `${((colLeft + colW - 100) / colW) * 100}%` }
+                        : undefined
+                  }
+                >
+                  <b>{p.q.replace("_", " ")}</b>
+                  {series.map((s) => (
+                    <span key={s.key}>
+                      <i style={{ background: s.color }} />
+                      {s.label}: {p[s.key] === null ? "—" : fmtPct(p[s.key] as number)}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="trend-xlabels" aria-hidden="true">

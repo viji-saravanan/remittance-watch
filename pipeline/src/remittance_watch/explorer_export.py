@@ -112,7 +112,11 @@ def _quotes(conn, quarter_id: int, corridor_pos: dict[tuple[str, str], int]) -> 
         JOIN providers p  ON p.id = qu.provider_id
         WHERE qu.quarter_id = %s
         ORDER BY c.source_iso3, c.dest_iso3, qu.amount_usd, qu.transparent DESC,
-                 qu.total_cost_pct ASC NULLS LAST, p.name, qu.instrument, qu.access_point NULLS LAST
+                 qu.total_cost_pct ASC NULLS LAST, p.name, qu.instrument,
+                 qu.access_point NULLS LAST, qu.id
+        -- qu.id: the survey publishes duplicate rows (same provider×instrument×
+        -- access point, different fee/margin payloads) — without it the order
+        -- inside those ties is whatever the planner returns
         """,
         (quarter_id,),
     ).fetchall()

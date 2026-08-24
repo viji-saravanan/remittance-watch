@@ -203,6 +203,13 @@
   letter-spacing: -0.01em;
 }
 
+/* programmatic focus target after a suggestion-chip jump (tabIndex=-1) */
+.ex-route:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: var(--s-1);
+  border-radius: var(--radius);
+}
+
 .ex-vintage {
   display: inline-flex;
   align-items: center;
@@ -227,8 +234,11 @@
 
 /* ── ranked rows ────────────────────────────────────────────────────────── */
 
+/* lists ship with UA 40px indent + block margins — this page has no global
+   reset, so every list/figure here zeroes its own box */
 .ex-rows {
-  margin-top: var(--s-4);
+  margin: var(--s-4) 0 0;
+  padding: 0;
   display: grid;
   gap: var(--s-2);
   list-style: none;
@@ -251,8 +261,9 @@
 }
 
 /* the tinted card is a step darker/lighter than the page, so its secondary
-   text steps up to muted — faint would drop under 4.5:1 on accent-soft */
-.ex-row.is-negative .ex-quiet {
+   text and rank numeral step up to muted — faint would drop under 4.5:1 on
+   accent-soft (both themes) */
+.ex-row.is-negative :is(.ex-quiet, .ex-rank) {
   color: var(--ink-muted);
 }
 
@@ -364,7 +375,8 @@
 }
 
 .ex-flagged-list {
-  margin-top: var(--s-2);
+  margin: var(--s-2) 0 0;
+  padding: 0;
   display: grid;
   gap: var(--s-2);
 }
@@ -379,8 +391,10 @@
 
 /* ── trend chart ────────────────────────────────────────────────────────── */
 
+/* figure ships with 1em 40px UA margins — the 40px sides overflow a phone */
 .trend {
-  margin-top: var(--s-12);
+  margin: var(--s-12) 0 0;
+  padding: 0;
   display: grid;
   gap: var(--s-3);
 }
@@ -515,6 +529,18 @@
   box-shadow: 0 0.25rem 1rem color-mix(in srgb, var(--ink) 12%, transparent);
   white-space: nowrap;
   z-index: 1;
+}
+
+/* edge columns flip alignment so the tooltip stays inside the plot */
+.trend-tip--start {
+  left: 0;
+  transform: none;
+}
+
+.trend-tip--end {
+  left: auto;
+  right: 0;
+  transform: none;
 }
 
 .trend-tip span {
@@ -676,13 +702,22 @@
     row-gap: var(--s-3);
   }
 
+  /* placement is explicit here: with the bar spanning full width, auto-flow
+     would drop the total into the 1.5rem rank column */
+  .ex-total {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
   /* bar drops to its own full-width line under the provider */
   .ex-bar {
     grid-column: 1 / -1;
+    grid-row: 2;
   }
 
   .ex-negnote {
     grid-column: 1 / -1;
+    grid-row: 3;
   }
 
   .ex-total {

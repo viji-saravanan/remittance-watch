@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ComponentType } from "react";
+import { RotateCw, SearchX } from "lucide-react";
 
 import { Loading } from "./Loading";
 
@@ -17,15 +18,22 @@ import { Loading } from "./Loading";
    delays the first paint. */
 export function ExplorerMount() {
   const [Client, setClient] = useState<ComponentType | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const raf = requestAnimationFrame(() => {
       timer = setTimeout(() => {
-        import("./ExplorerClient").then((m) => {
-          if (alive) setClient(() => m.ExplorerClient);
-        });
+        import("./ExplorerClient")
+          .then((m) => {
+            if (alive) setClient(() => m.ExplorerClient);
+          })
+          .catch(() => {
+            // a failed chunk must not strand the skeleton forever
+            if (alive) setFailed(true);
+          });
       }, 0);
     });
     return () => {
@@ -33,7 +41,25 @@ export function ExplorerMount() {
       cancelAnimationFrame(raf);
       if (timer) clearTimeout(timer);
     };
-  }, []);
+  }, [attempt]);
 
-  return Client ? <Client /> : <Loading label="Loading corridor prices" />;
+  if (Client) return <Client />;
+  if (failed)
+    return (
+      <div className="ex-state ex-state--error" role="alert">
+        <SearchX size="1.5em" aria-hidden />
+        <p>The explorer didn&rsquo;t load. It&rsquo;s a static page — this is usually transient.</p>
+        <button
+          type="button"
+          className="ex-retry"
+          onClick={() => {
+            setFailed(false);
+            setAttempt((a) => a + 1);
+          }}
+        >
+          <RotateCw size="1em" aria-hidden /> Retry
+        </button>
+      </div>
+    );
+  return <Loading label="Loading corridor prices" />;
 }
