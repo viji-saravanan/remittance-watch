@@ -28,6 +28,11 @@ def db_url() -> str:
     # Point at the throwaway test database, not whatever the env points at.
     url = _swap_dbname(url, "rw_test")
     if not _server_available(_admin_url(url)):
+        if os.getenv("GITHUB_ACTIONS") == "true":
+            # In CI the service container is supposed to be there; a skip here
+            # would exit 0 with ZERO e2e coverage of exactly the tests that
+            # guard published numbers — a green job must mean they ran.
+            pytest.fail(f"Postgres unreachable in CI at {url} — e2e suite cannot silently pass")
         pytest.skip("no Postgres reachable for e2e tests")
     _recreate_db(_admin_url(url), "rw_test")
     yield url
