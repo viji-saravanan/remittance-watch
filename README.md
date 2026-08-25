@@ -53,9 +53,11 @@ curl -s https://viji-saravanan.github.io/remittance-watch/v1/quote/USA/IND/200.j
   | jq '{ranked: (.ranked | length), not_ranked: (.not_ranked | length)}'
 ```
 
-Every example above works verbatim against production — CI checks the shapes against the same
-fixtures the pipeline tests use. Field names are stable and readable (`fx_margin_pct`, never
-`m`); **404 means the World Bank did not publish that corridor or tier this quarter** — check
+Every example above works verbatim against production. CI checks the payload shapes against
+the same fixtures the pipeline tests use, plus the committed `/v1/` tree's internal
+consistency (index ↔ corridor records ↔ tier slices ↔ OpenAPI spec). Field names are stable
+and readable (`fx_margin_pct`, never `m`); **404 means the World Bank did not publish that
+corridor or tier this quarter** — check
 `/v1/corridors.json` for what exists. Responses are CDN-cached (`max-age=600`) and carry
 `meta.generated_utc` so a stale read is detectable; there is no rate limiting — fair use is
 the repo's 100 GB/month bandwidth cap, and bulk users should clone the repo (the artifacts

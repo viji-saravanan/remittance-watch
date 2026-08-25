@@ -22,7 +22,7 @@ building" — is what this ADR executes.
 |---|---|---|
 | **Path-mapped static files** (`/v1/quote/USA/IND/200.json`) | Zero runtime; every URL is citable and git-diffable; CDN-cached; 404 is honest (corridor not surveyed) | Path params instead of query strings (documented in OpenAPI, so equivalent for machines) |
 | Cloudflare Worker translating queries to static fetches | Issue's literal query-string shape | New account + deploy surface for URL cosmetics; ADR-0005 explicitly deferred this until request-time compute is *needed* |
-| Keep the single explorer bundle as "the API" | Already shipped | One 2.5 MB download to read one corridor; no per-corridor citation; not an API in any audience's vocabulary |
+| Keep the single explorer bundle as "the API" | Already shipped | One ~1.5 MB download to read one corridor; compressed keys (`tc`, `m`) violate rule 1; no per-corridor citation; not an API in any audience's vocabulary |
 
 ## Decision
 
@@ -33,7 +33,7 @@ every artifact). Endpoints, all `GET`, all under the site's base path:
 |---|---|
 | `/v1/corridors.json` | Index: every corridor with names, ranked-quote count, $200 average, quarter |
 | `/v1/corridors/{from}/{to}.json` | One corridor: meta, trend (≤4 quarters), ALL quotes both tiers, ranked cheapest-first (ADR-0007) |
-| `/v1/quote/{from}/{to}/{amount}.json` | The issue's `/v1/quote?from=&to=&amount=`, path-mapped: ranked + flagged quotes for one corridor at one published tier (`200`/`500`) |
+| `/v1/quote/{from}/{to}/{amount}.json` | The issue's `/v1/quote?from=&to=&amount=`, path-mapped: ranked + not-ranked quotes for one corridor at one published tier (`200`/`500`) |
 | `/v1/openapi.json` | The spec describing all of the above |
 
 Rules:
@@ -62,8 +62,12 @@ Rules:
 
 ## Consequences
 
-- Every README example is a `curl` against a file that exists in the repo at merge time —
-  "works verbatim against production" is checkable in CI, not aspirational.
+- Every README example is a `curl` against a file that exists in the repo at merge time.
+  CI enforces what it can mechanically: payload shapes via the shared exporter's fixture
+  e2e, plus the committed `/v1/` tree's internal consistency (index ↔ corridor records ↔
+  tier slices ↔ OpenAPI spec) with no Postgres needed. Artifact freshness after a quarterly
+  re-ingest stays a release step — ingest-check opens exactly that issue — since CI carries
+  no workbook to re-derive the artifacts from.
 - p95 latency is a CDN property, not our code: measured, recorded in the PR, and re-measurable
   with the same one-liner.
 - ~1,050 small committed files per quarter. The quarterly diff is large but purely additive

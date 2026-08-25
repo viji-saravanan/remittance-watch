@@ -1,7 +1,9 @@
 """Emit the versioned explorer bundle (public/data/rpw-explorer-v1.json).
 
 The corridor explorer's entire dataset, per ADR-0008: one committed, deterministic
-JSON artifact the site fetches lazily — and that M3's API can later publish as-is.
+JSON artifact the site fetches lazily. Its queries now also feed the public API
+(ADR-0009) — which re-emits with readable field names rather than serving this
+bundle as-is, so the two surfaces can never disagree about a number.
 Nothing here is interpolated or invented: the only amounts are the two tiers the
 World Bank actually surveys ($200 / $500), the only costs are the published columns,
 and rankings are a faithful projection (ADR-0007) — negative costs stay verbatim so
