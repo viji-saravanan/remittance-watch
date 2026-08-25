@@ -5,12 +5,12 @@
 > hidden inside the exchange rate — using the World Bank's open pricing data.
 > No affiliate links. The ranking cannot be bought.
 
-**Status:** M0 shipped — [live on GitHub Pages](https://viji-saravanan.github.io/remittance-watch/).
+**Status:** M0–M2 shipped — [live on GitHub Pages](https://viji-saravanan.github.io/remittance-watch/).
 M1 (ingestion pipeline) merged: 204,469 source rows → 408,938 quotes across 37 quarters,
 contract-tested, idempotent, [packaged as a container](https://ghcr.io/viji-saravanan/rw-ingest).
-M2 landing: the page is now a GSAP scroll-driven story (mobile-first, reduced-motion aware,
-readable with JS off) — the corridor explorer itself lands later in M2.
-[Build log →](https://github.com/viji-saravanan/remittance-watch/issues?q=milestone%3A%22M0%22)
+M2 shipped the GSAP scroll-story landing and the corridor explorer — every provider on a
+corridor ranked by true total cost, keyboard-navigable, Lighthouse 95/100/100/100 mobile.
+M3 ships the public API (below). [Build log →](https://github.com/viji-saravanan/remittance-watch/issues?q=milestone%3A%22M0%22)
 
 ## Why this exists
 
@@ -32,6 +32,41 @@ npm run build   # static export → out/
 
 Node ≥ 20. No API keys and no hosted services — the pipeline's Postgres is a local or CI
 container (see [`pipeline/`](pipeline/)).
+
+## Public API v1
+
+Every corridor the World Bank surveys, as static JSON on the Pages CDN — no keys, no rate-limit
+signup, [OpenAPI spec](https://viji-saravanan.github.io/remittance-watch/v1/openapi.json)
+([source](public/v1/openapi.json)). Regenerated at each quarterly ingest; every published
+number is diffable in git ([ADR-0009](docs/adr/0009-public-api-static-json.md)).
+
+```bash
+# Every surveyed corridor with its $200 average (348 in 2025_3Q)
+curl -s https://viji-saravanan.github.io/remittance-watch/v1/corridors.json | jq '.corridors[0]'
+
+# One corridor: every provider, both tiers, ranked cheapest-first (negative totals included)
+curl -s https://viji-saravanan.github.io/remittance-watch/v1/corridors/USA/IND.json \
+  | jq '.quotes[0] | {provider, fee_pct, fx_margin_pct, total_cost_pct}'
+
+# One corridor at one published tier: ranked vs not-ranked (margin undisclosed)
+curl -s https://viji-saravanan.github.io/remittance-watch/v1/quote/USA/IND/200.json \
+  | jq '{ranked: (.ranked | length), not_ranked: (.not_ranked | length)}'
+```
+
+Every example above works verbatim against production. CI checks the payload shapes against
+the same fixtures the pipeline tests use, plus the committed `/v1/` tree's internal
+consistency (index ↔ corridor records ↔ tier slices ↔ OpenAPI spec). Field names are stable
+and readable (`fx_margin_pct`, never `m`); **404 means the World Bank did not publish that
+corridor or tier this quarter** — check
+`/v1/corridors.json` for what exists. Responses are CDN-cached (`max-age=600`) and carry
+`meta.generated_utc` so a stale read is detectable; there is no rate limiting — fair use is
+the repo's 100 GB/month bandwidth cap, and bulk users should clone the repo (the artifacts
+*are* the dataset).
+
+**Version policy** ([ADR-0009](docs/adr/0009-public-api-static-json.md)): additive changes
+(new optional fields, new corridors) ship in place; breaking changes (field renames/removals,
+semantic changes) ship as `/v2/` with `/v1/` dual-running for at least one full quarter and a
+deprecation banner here from day one.
 
 ## Architecture (one paragraph)
 

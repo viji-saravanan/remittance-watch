@@ -4,16 +4,20 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
+# PR runs cancel on new pushes. Pushes to main must NOT: the same workflow now
+# ends in a Pages deploy, and killing it mid-publish can half-ship the site.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: actions/setup-node@v4
         with:
@@ -28,3 +32,87 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  pipeline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: rw
+          POSTGRES_PASSWORD: rw
+          POSTGRES_DB: rw
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U rw"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://rw:rw@localhost:5433/rw
+      UV_CACHE_DIR: /tmp/.uv-cache
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install
+        working-directory: pipeline
+        run: uv sync --locked
+
+      # the site AND the public API are generated from these code paths —
+      # a red test here means a published number would be wrong. conftest
+      # fails (not skips) when Postgres is unreachable under GITHUB_ACTIONS,
+      # so green always means the e2e suite actually ran.
+      - name: Pipeline tests (contract fixture e2e)
+        working-directory: pipeline
+        run: uv run pytest -q
+
+  # Deploy rides the test jobs instead of racing them (this used to be a
+  # separate push-triggered workflow): wrong artifacts can no longer publish
+  # while tests are still running or after they fail.
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: [verify, pipeline-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    # Do NOT cancel in-progress deploys — cancelling mid-publish can leave the site half-shipped.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      # Supplies base_path so next.config derives basePath from where Pages actually
+      # serves the site (repo-rename-proof), instead of trusting a hardcoded default.
+      - uses: actions/configure-pages@v6
+        id: pages
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+        env:
+          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: out
+
+      - uses: actions/deploy-pages@v5
+        id: deployment
