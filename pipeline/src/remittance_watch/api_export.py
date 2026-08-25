@@ -143,8 +143,14 @@ def build_quote_record(conn, src: str, dst: str, amount: int, generated: str) ->
     )
     if full is None or int(amount) not in AMOUNTS:
         return None  # unknown corridor or unpublished tier — the 404 is the answer
-    ranked = [q for q in full["quotes"] if q["transparent"] and q["total_cost_pct"] is not None]
-    not_ranked = [q for q in full["quotes"] if not (q["transparent"] and q["total_cost_pct"] is not None)]
+    ranked = [q for q in full["quotes"]
+              if q["amount_usd"] == int(amount)
+              and q["transparent"] and q["total_cost_pct"] is not None]
+    not_ranked = [q for q in full["quotes"]
+                  if q["amount_usd"] == int(amount)
+                  and not (q["transparent"] and q["total_cost_pct"] is not None)]
+    if not ranked and not not_ranked:
+        return None  # no quotes at this tier — same answer as the absent file
     return {
         "meta": _meta(quarter, generated),
         "corridor": full["corridor"],
@@ -323,8 +329,9 @@ def _openapi() -> dict:
 def export_api(conn, out: Path, generated: str | None = None) -> list[Path]:
     """Write every v1 artifact. The three source queries run ONCE and every
     file is sliced from memory; one timestamp stamps the whole run so a
-    quarterly regeneration is one coherent snapshot. `generated` is injectable
-    for byte-determinism tests."""
+    quarterly regeneration is one coherent snapshot. Files surviving from an
+    earlier run that this quarter does not justify are pruned (rule 5).
+    `generated` is injectable for byte-determinism tests."""
     generated = generated or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     quarter_id, quarter = _latest_quarter(conn)
     index_rows = _corridor_index(conn, quarter_id)
@@ -365,4 +372,23 @@ def export_api(conn, out: Path, generated: str | None = None) -> list[Path]:
                 "not_ranked": not_ranked,
             })
     _write(Path("openapi.json"), _openapi())
+
+    # Rule 5 cuts both ways: a corridor or tier this quarter does NOT publish
+    # must stop being served, not linger from a previous run as a stale 200.
+    # Remove pre-existing JSON this run did not write (foreign files survive);
+    # then drop directories the prune emptied.
+    written_set = set(written)
+    stale = [p for p in out.rglob("*.json") if p not in written_set]
+    for p in stale:
+        p.unlink()
+    for d in sorted({p.parent for p in stale}, key=lambda x: len(x.parts), reverse=True):
+        rmdir_if_empty(d)
+        rmdir_if_empty(d.parent)  # quote/{from}/{to} may empty out entirely
     return sorted(written)
+
+
+def rmdir_if_empty(d: Path) -> None:
+    try:
+        d.rmdir()  # refuses when non-empty
+    except OSError:
+        pass

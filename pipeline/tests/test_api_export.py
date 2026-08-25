@@ -107,6 +107,38 @@ class TestQuoteRecord:
         assert build_quote_record(migrated_conn, "AGO", "NAM", 300, GENERATED) is None
         assert build_quote_record(migrated_conn, "USA", "IND", 200, GENERATED) is None
 
+    def test_empty_tier_is_none_like_the_emitted_surface(self, api_dir, migrated_conn):
+        """export_api skips the quote file when a tier has no rows; the builder
+        must give the same answer (None), never an empty 200-shaped payload."""
+        from remittance_watch.api_export import build_quote_record
+
+        migrated_conn.execute("""
+            DELETE FROM quotes qu USING corridors c
+            WHERE c.id = qu.corridor_id AND c.source_iso3 = 'AGO' AND c.dest_iso3 = 'NAM'
+              AND qu.amount_usd = 200
+        """)
+        assert build_quote_record(migrated_conn, "AGO", "NAM", 200, GENERATED) is None
+        assert build_quote_record(migrated_conn, "AGO", "NAM", 500, GENERATED) is not None
+
+
+class TestRegeneration:
+    def test_prunes_files_this_quarter_does_not_justify(self, api_dir, migrated_conn):
+        """A later quarter that drops survey coverage must stop serving the
+        dropped corridor: re-running export over the same tree deletes its
+        files instead of leaving stale 200s behind (ADR-0009 rule 5)."""
+        migrated_conn.execute("""
+            DELETE FROM quotes qu USING corridors c
+            WHERE c.id = qu.corridor_id AND c.source_iso3 = 'AGO' AND c.dest_iso3 = 'ZAF'
+        """)
+        export_api(migrated_conn, api_dir)
+
+        assert not (api_dir / "corridors" / "AGO" / "ZAF.json").exists()
+        assert not (api_dir / "quote" / "AGO" / "ZAF").exists()
+        idx = _load(api_dir, "corridors.json")
+        assert ("AGO", "ZAF") not in [(c["from"], c["to"]) for c in idx["corridors"]]
+        # the surviving corridor is untouched
+        assert (api_dir / "corridors" / "AGO" / "NAM.json").exists()
+
 
 class TestFiles:
     def test_emitted_file_set(self, api_dir):
