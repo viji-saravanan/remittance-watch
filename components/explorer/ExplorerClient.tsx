@@ -333,7 +333,9 @@ function Explorer({
           {meta.source.workbook} · {meta.source.license} ·{" "}
           <a href={meta.source.url} target="_blank" rel="noopener noreferrer">
             source data
-          </a>
+          </a>{" "}
+          · these numbers are also a{" "}
+          <a href="../v1/corridors.json">queryable API</a> (JSON, citable URLs)
         </p>
       </details>
     </div>
