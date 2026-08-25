@@ -27,6 +27,9 @@ API_VERSION = 1
 
 # Production origin for the OpenAPI `servers` field. Mirrors next.config's
 # basePath (owner/repo); changes only on a repo rename or custom domain.
+# OAS *appends* path keys to the expanded server URL (no RFC-3986 resolution),
+# so the basePath lives HERE ONLY — path keys below start at /v1/, never
+# /remittance-watch/v1/, or spec-driven clients double the segment and 404.
 PAGES_BASE = "https://viji-saravanan.github.io/remittance-watch"
 
 AMOUNTS = [200, 500]
@@ -220,7 +223,7 @@ def _openapi() -> dict:
         },
         "servers": [{"url": PAGES_BASE, "description": "GitHub Pages (production)"}],
         "paths": {
-            "/remittance-watch/v1/corridors.json": {
+            "/v1/corridors.json": {
                 "get": {
                     "operationId": "listCorridors",
                     "summary": "Index of every surveyed corridor",
@@ -243,7 +246,7 @@ def _openapi() -> dict:
                     },
                 },
             },
-            "/remittance-watch/v1/corridors/{from}/{to}.json": {
+            "/v1/corridors/{from}/{to}.json": {
                 "get": {
                     "operationId": "getCorridor",
                     "summary": "One corridor: every quote, both tiers, ranking order",
@@ -280,10 +283,10 @@ def _openapi() -> dict:
                     },
                 },
             },
-            "/remittance-watch/v1/quote/{from}/{to}/{amount}.json": {
+            "/v1/quote/{from}/{to}/{amount}.json": {
                 "get": {
                     "operationId": "getQuotes",
-                    "summary": "One corridor at one published tier, ranked vs flagged",
+                    "summary": "One corridor at one published tier, ranked vs not-ranked",
                     "description": "Path-mapped form of the issue's "
                                    "GET /v1/quote?from=&to=&amount= (static CDN, ADR-0009).",
                     "parameters": [
@@ -296,7 +299,7 @@ def _openapi() -> dict:
                          "description": "the only amounts the World Bank publishes"},
                     ],
                     "responses": {
-                        "200": {"description": "Ranked (and flagged) quotes for the tier",
+                        "200": {"description": "Ranked and not-ranked quotes for the tier",
                                 "content": {"application/json": {"schema": {
                                     "type": "object",
                                     "properties": {

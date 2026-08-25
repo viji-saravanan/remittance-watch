@@ -137,10 +137,21 @@ class TestFiles:
         spec = _load(api_dir, "openapi.json")
         assert spec["openapi"] == "3.1.0"
         assert spec["servers"][0]["url"] == PAGES_BASE
+        # OAS appends path keys to the server URL verbatim (no RFC-3986
+        # resolution): the server carries the /remittance-watch basePath, so a
+        # path key repeating it would compose a doubled segment that 404s for
+        # every spec-driven client (Swagger UI try-it-out, code generators).
         assert set(spec["paths"]) == {
-            "/remittance-watch/v1/corridors.json",
-            "/remittance-watch/v1/corridors/{from}/{to}.json",
-            "/remittance-watch/v1/quote/{from}/{to}/{amount}.json",
+            "/v1/corridors.json",
+            "/v1/corridors/{from}/{to}.json",
+            "/v1/quote/{from}/{to}/{amount}.json",
         }
-        quote_op = spec["paths"]["/remittance-watch/v1/quote/{from}/{to}/{amount}.json"]["get"]
+        for key in spec["paths"]:
+            assert key.startswith("/v1/")
+            assert f"{PAGES_BASE}{key}" == (
+                f"https://viji-saravanan.github.io/remittance-watch{key}"
+            )
+        quote_op = spec["paths"]["/v1/quote/{from}/{to}/{amount}.json"]["get"]
         assert quote_op["parameters"][2]["schema"]["enum"] == [200, 500]
+        # the payload key is `not_ranked` everywhere the prose speaks of it
+        assert "flagged" not in json.dumps(spec)
