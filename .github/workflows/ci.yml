@@ -28,3 +28,39 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  pipeline-tests:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: rw
+          POSTGRES_PASSWORD: rw
+          POSTGRES_DB: rw
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U rw"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://rw:rw@localhost:5433/rw
+      UV_CACHE_DIR: /tmp/.uv-cache
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install
+        working-directory: pipeline
+        run: uv sync --locked
+
+      # the site AND the public API are generated from these code paths —
+      # a red test here means a published number would be wrong
+      - name: Pipeline tests (contract fixture e2e)
+        working-directory: pipeline
+        run: uv run pytest -q
