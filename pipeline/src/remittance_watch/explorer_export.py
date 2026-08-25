@@ -95,12 +95,14 @@ def _trends(conn, quarter_id: int) -> dict[tuple[str, str], list[dict]]:
     return trends
 
 
-def _quotes(conn, quarter_id: int, corridor_pos: dict[tuple[str, str], int]) -> list[dict]:
+def _quote_rows(conn, quarter_id: int):
     """Every latest-quarter quote for indexed corridors, both published tiers,
     cheapest-first within corridor×tier (the ranking itself — computed once here,
-    deterministically, so the client never re-sorts). Non-transparent rows sort
-    after transparent ones within the same tier."""
-    rows = conn.execute(
+    deterministically, so neither the client nor the API ever re-sorts).
+    Non-transparent rows sort after transparent ones within the same tier.
+    Shared by the explorer bundle (ADR-0008) and the public API (ADR-0009) so
+    the two surfaces can never disagree about a number."""
+    return conn.execute(
         """
         SELECT c.source_iso3, c.dest_iso3, qu.amount_usd, p.name, qu.instrument,
                qu.access_point,
@@ -121,6 +123,29 @@ def _quotes(conn, quarter_id: int, corridor_pos: dict[tuple[str, str], int]) -> 
         (quarter_id,),
     ).fetchall()
 
+
+# The ranking policy ships IN every artifact (bundle + API) — the methodology
+# text travels with the numbers it describes (ADR-0007).
+RANKING_POLICY = {
+    "ranking": (
+        "Providers are ranked by total cost exactly as published — ascending, "
+        "never clamped or excluded (ADR-0007)."
+    ),
+    "negative_margin": (
+        "A negative FX margin means the provider's exchange rate beats the World "
+        "Bank's reference rate, so cost measured against the official rate falls "
+        "below zero. The printed fee is still positive. Shown as a 'rate "
+        "advantage' flag, never hidden."
+    ),
+    "non_transparent": (
+        "Quotes whose FX margin is not disclosed are never ranked; they are listed "
+        "separately with a flag (the published total is kept)."
+    ),
+}
+
+
+def _quotes(conn, quarter_id: int, corridor_pos: dict[tuple[str, str], int]) -> list[dict]:
+    rows = _quote_rows(conn, quarter_id)
     quotes = []
     for src, dst, amount, provider, instrument, access, fee, margin, total, transparent in rows:
         pos = corridor_pos.get((src, dst))
@@ -165,22 +190,7 @@ def build_explorer_data(conn) -> dict:
             "generator": "rw-ingest export-explorer",
             "source": SOURCE,
             "amounts": [200, 500],
-            "policy": {
-                "ranking": (
-                    "Providers are ranked by total cost exactly as published — ascending, "
-                    "never clamped or excluded (ADR-0007)."
-                ),
-                "negative_margin": (
-                    "A negative FX margin means the provider's exchange rate beats the World "
-                    "Bank's reference rate, so cost measured against the official rate falls "
-                    "below zero. The printed fee is still positive. Shown as a 'rate "
-                    "advantage' flag, never hidden."
-                ),
-                "non_transparent": (
-                    "Quotes whose FX margin is not disclosed are never ranked; they are listed "
-                    "separately with a flag (the published total is kept)."
-                ),
-            },
+            "policy": RANKING_POLICY,
         },
         "countries": [{"iso3": iso, "name": name} for iso, name in countries],
         "corridors": corridors,

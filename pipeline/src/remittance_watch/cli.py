@@ -66,6 +66,15 @@ def main(argv: list[str] | None = None) -> int:
         help="output path relative to the repo root (default: public/data/rpw-explorer-v1.json)",
     )
 
+    p_api = sub.add_parser(
+        "export-api",
+        help="emit the public API v1 as static JSON under public/v1/ (ADR-0009)",
+    )
+    p_api.add_argument(
+        "--out", type=Path, default=Path("public/v1"),
+        help="output directory relative to the repo root (default: public/v1)",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "migrate":
@@ -80,6 +89,8 @@ def main(argv: list[str] | None = None) -> int:
         _export_site_data(args.out)
     elif args.command == "export-explorer":
         _export_explorer(args.out)
+    elif args.command == "export-api":
+        _export_api(args.out)
     return 0
 
 
@@ -164,6 +175,17 @@ def _export_explorer(out: Path) -> None:
         written = export_explorer_data(conn, out)
     print(f"wrote: {written}")
     print("the explorer fetches this bundle at runtime — regenerate after every re-ingest")
+
+
+def _export_api(out: Path) -> None:
+    from .api_export import export_api
+
+    if not out.is_absolute():
+        out = Path(__file__).resolve().parents[3] / out  # repo-relative, same rule as site data
+    with db.connect() as conn:
+        written = export_api(conn, out)
+    print(f"wrote: {len(written)} files under {out}")
+    print("the public API v1 is committed static JSON (ADR-0009) — regenerate after every re-ingest")
 
 
 def _verify() -> None:
